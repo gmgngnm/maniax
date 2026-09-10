@@ -8,7 +8,7 @@
     ],
     "include_unmatched": false,
     "drop_past_events": true,
-    "max_queries": 40,
+    "max_queries": 60,
     "region_note": "地域の絞り込みはしていない。全国の情報を拾ったうえで本文に劇場名が出る。"
   },
   "people": [

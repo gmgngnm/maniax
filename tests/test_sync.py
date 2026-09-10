@@ -86,3 +86,42 @@ class TestToWrites(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestQueryCoverage(unittest.TestCase):
+    """上限で特定のカテゴリが丸ごと落ちていないか。
+
+    以前は作品ごとに 5 本立てていたため、上限 40 だと展示とライブの
+    クエリが 1 本も実行されていなかった。
+    """
+
+    def _watchlist(self, n_works):
+        return {
+            "settings": {"max_queries": 60},
+            "people": [{"name": "富野由悠季", "role": "監督"}],
+            "works": [{"title": "作品" + str(i)} for i in range(n_works)],
+        }
+
+    def test_every_template_reaches_every_work(self):
+        from aew.sources import WORK_QUERY_TEMPLATES, queries_for
+
+        watchlist = self._watchlist(18)
+        queries = queries_for(watchlist)
+        for template in WORK_QUERY_TEMPLATES:
+            for work in watchlist["works"]:
+                self.assertIn(template.format(term=work["title"]), queries)
+
+    def test_cap_still_applies(self):
+        from aew.sources import queries_for
+
+        watchlist = self._watchlist(100)
+        self.assertEqual(len(queries_for(watchlist)), 60)
+
+    def test_cap_spreads_across_templates(self):
+        # 打ち切りが起きても、先頭のテンプレートだけで埋まらないこと
+        from aew.sources import queries_for
+
+        watchlist = self._watchlist(100)
+        watchlist["settings"]["max_queries"] = 30
+        queries = queries_for(watchlist)
+        self.assertTrue(any(q.endswith("リバイバル上映") for q in queries))

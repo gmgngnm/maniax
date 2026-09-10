@@ -21,7 +21,7 @@ DEFAULT_SETTINGS = {
     "categories": ["revival", "screening_event", "exhibition", "concert"],
     "include_unmatched": False,
     "drop_past_events": True,
-    "max_queries": 40,
+    "max_queries": 60,
 }
 
 
