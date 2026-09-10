@@ -18,7 +18,7 @@ Routine（定期トリガー）が毎回まっさらなクラウドセッショ�
 | 巡回 | 頻度 | 役割 | 手順書 |
 |---|---|---|---|
 | 全件 | 毎朝 8:12 | ウォッチリスト全部を検索し直す | [ROUTINE_PROMPT.md](ROUTINE_PROMPT.md) |
-| 差分 | 毎時 48 分 | GUI で追加された分と、再検索ボタンの予約だけを拾う | [ROUTINE_INCREMENTAL.md](ROUTINE_INCREMENTAL.md) |
+| 差分 | 毎時 0 分 | GUI で追加された分と、再検索ボタンの予約だけを拾う | [ROUTINE_INCREMENTAL.md](ROUTINE_INCREMENTAL.md) |
 
 差分巡回は、やることがなければ DB を読むだけで即終了する。
 1 日 24 回動くので、空振りを安くするのが前提の設計になっている。
