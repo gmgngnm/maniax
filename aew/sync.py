@@ -6,6 +6,12 @@ GUI 側が持つウォッチリストを収集側の形に直し、収集結果�
   # DB から取り出したウォッチリストを watchlist.json の形にする
   python3 -m aew.sync from-db --dir /tmp/db/watchlist --out watchlist.json
 
+  # そのうち、まだ一度も検索していない分だけ
+  python3 -m aew.sync from-db --dir /tmp/db/watchlist --out /tmp/new.json --pending-only
+
+  # 検索し終えた分に検索済みの印をつける書き込み一覧
+  python3 -m aew.sync mark-searched --dir /tmp/db/watchlist --out /tmp/marks.json
+
   # ダイジェストを DB への書き込み一覧にする
   python3 -m aew.sync to-writes --digest /tmp/digest.json --out /tmp/writes.json
 """
@@ -25,8 +31,40 @@ DEFAULT_SETTINGS = {
 }
 
 
-def from_db(doc_dir: Path, fallback: Path | None) -> dict:
-    """read_db --out_dir が吐いた JSON 群を watchlist.json の形に組み直す。"""
+def is_pending(doc: dict) -> bool:
+    """まだ一度も検索していないエントリか。
+
+    GUI から足したばかりの項目には searched: false が入る。翌朝の巡回を
+    待たずに拾いたいのはこれだけ。フィールドが無い古い行は、取りこぼしを
+    避けるため検索済みとみなす（新規追加時は必ず false が入るため）。
+    """
+    return doc.get("searched") is False
+
+
+def pending_ids(doc_dir: Path) -> list[str]:
+    """未検索エントリのドキュメント ID を、ファイル名から拾う。"""
+    out = []
+    for path in sorted(Path(doc_dir).glob("*.json")):
+        if is_pending(json.loads(path.read_text(encoding="utf-8"))):
+            out.append(path.stem)
+    return out
+
+
+def mark_writes(doc_ids: list[str]) -> list[dict]:
+    """検索済みの印をつける update 書き込みを組む。"""
+    return [
+        {"op": "update", "collection": "watchlist", "doc_id": doc_id,
+         "data": {"searched": True}}
+        for doc_id in doc_ids
+    ]
+
+
+def from_db(doc_dir: Path, fallback: Path | None, pending_only: bool = False) -> dict:
+    """read_db --out_dir が吐いた JSON 群を watchlist.json の形に組み直す。
+
+    pending_only を立てると、まだ検索していないエントリだけを拾う。
+    追加直後の作品を翌朝まで待たずに検索するために使う。
+    """
     settings = dict(DEFAULT_SETTINGS)
     if fallback and fallback.exists():
         existing = json.loads(fallback.read_text(encoding="utf-8"))
@@ -35,6 +73,8 @@ def from_db(doc_dir: Path, fallback: Path | None) -> dict:
     works, people = [], []
     for path in sorted(Path(doc_dir).glob("*.json")):
         doc = json.loads(path.read_text(encoding="utf-8"))
+        if pending_only and not is_pending(doc):
+            continue
         label = (doc.get("label") or "").strip()
         if not label:
             continue
@@ -86,21 +126,41 @@ def main(argv=None) -> int:
     a.add_argument("--dir", required=True, help="read_db --out_dir が作った watchlist ディレクトリ")
     a.add_argument("--out", required=True)
     a.add_argument("--fallback", default="watchlist.json", help="settings の引き継ぎ元")
+    a.add_argument("--pending-only", action="store_true",
+                   help="まだ検索していないエントリだけを出す")
 
     b = sub.add_parser("to-writes", help="ダイジェスト -> DB 書き込み一覧")
     b.add_argument("--digest", required=True)
     b.add_argument("--out", required=True)
 
+    c = sub.add_parser("mark-searched", help="未検索エントリに検索済みの印をつける")
+    c.add_argument("--dir", required=True)
+    c.add_argument("--out", required=True)
+    c.add_argument("--all", action="store_true",
+                   help="未検索に限らず全エントリを対象にする（日次の全件巡回向け）")
+
     args = parser.parse_args(argv)
 
     if args.command == "from-db":
-        result = from_db(Path(args.dir), Path(args.fallback))
+        result = from_db(Path(args.dir), Path(args.fallback), args.pending_only)
         if not result["works"] and not result["people"]:
+            if args.pending_only:
+                # 追加分がないのは平常。呼び出し側が終了コードで判断する。
+                print("no pending entries")
+                return 2
             raise SystemExit(
                 "DB のウォッチリストが空。GUI 側が消えている恐れがあるので、"
                 "リポジトリの watchlist.json をそのまま使うこと。"
             )
         payload = result
+    elif args.command == "mark-searched":
+        directory = Path(args.dir)
+        ids = (
+            [p.stem for p in sorted(directory.glob("*.json"))]
+            if args.all
+            else pending_ids(directory)
+        )
+        payload = mark_writes(ids)
     else:
         payload = to_writes(json.loads(Path(args.digest).read_text(encoding="utf-8")))
 

@@ -125,3 +125,60 @@ class TestQueryCoverage(unittest.TestCase):
         watchlist["settings"]["max_queries"] = 30
         queries = queries_for(watchlist)
         self.assertTrue(any(q.endswith("リバイバル上映") for q in queries))
+
+
+class TestPending(unittest.TestCase):
+    """GUI から追加した直後のエントリだけを拾えるか。"""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.dir = Path(self.tmp.name) / "watchlist"
+        self.dir.mkdir()
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def _doc(self, name, body):
+        (self.dir / f"{name}.json").write_text(
+            json.dumps(body, ensure_ascii=False), encoding="utf-8"
+        )
+
+    def test_only_unsearched_entries_returned(self):
+        from aew.sync import from_db
+
+        self._doc("w01", {"kind": "work", "label": "既存作品", "searched": True})
+        self._doc("w02", {"kind": "work", "label": "追加したて", "searched": False})
+        got = from_db(self.dir, None, pending_only=True)
+        self.assertEqual([w["title"] for w in got["works"]], ["追加したて"])
+
+    def test_missing_flag_counts_as_searched(self):
+        # 印のない古い行を未検索扱いすると、毎回全件を引き直してしまう
+        from aew.sync import from_db
+
+        self._doc("w01", {"kind": "work", "label": "印のない行"})
+        self.assertEqual(from_db(self.dir, None, pending_only=True)["works"], [])
+
+    def test_pending_ids_uses_document_id(self):
+        from aew.sync import pending_ids
+
+        self._doc("w01", {"kind": "work", "label": "A", "searched": True})
+        self._doc("w07", {"kind": "person", "label": "B", "searched": False})
+        self.assertEqual(pending_ids(self.dir), ["w07"])
+
+    def test_mark_writes_are_updates_not_replacements(self):
+        from aew.sync import mark_writes
+
+        writes = mark_writes(["w07"])
+        self.assertEqual(writes[0]["op"], "update")
+        self.assertEqual(writes[0]["data"], {"searched": True})
+        # set だと label や aliases を消してしまう
+        self.assertNotIn("label", writes[0]["data"])
+
+    def test_pending_entries_still_produce_queries(self):
+        from aew.sources import queries_for
+        from aew.sync import from_db
+
+        self._doc("w02", {"kind": "work", "label": "リーンの翼", "searched": False})
+        queries = queries_for(from_db(self.dir, None, pending_only=True))
+        self.assertTrue(all("リーンの翼" in q for q in queries))
+        self.assertEqual(len(queries), 3)
