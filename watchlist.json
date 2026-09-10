@@ -1,0 +1,134 @@
+{
+  "settings": {
+    "categories": [
+      "revival",
+      "screening_event",
+      "exhibition",
+      "concert"
+    ],
+    "include_unmatched": false,
+    "drop_past_events": true,
+    "max_queries": 40,
+    "region_note": "地域の絞り込みはしていない。全国の情報を拾ったうえで本文に劇場名が出る。"
+  },
+  "people": [
+    {
+      "name": "富野由悠季",
+      "role": "監督",
+      "aliases": [
+        "富野喜幸",
+        "井荻麟",
+        "斧谷稔"
+      ]
+    }
+  ],
+  "works": [
+    {
+      "title": "機動戦士ガンダム",
+      "aliases": [
+        "ファーストガンダム"
+      ]
+    },
+    {
+      "title": "機動戦士Zガンダム",
+      "aliases": [
+        "Zガンダム",
+        "ゼータガンダム"
+      ]
+    },
+    {
+      "title": "機動戦士ガンダムZZ",
+      "aliases": [
+        "ダブルゼータ"
+      ]
+    },
+    {
+      "title": "機動戦士ガンダム 逆襲のシャア",
+      "aliases": [
+        "逆襲のシャア",
+        "逆シャア"
+      ]
+    },
+    {
+      "title": "機動戦士Vガンダム",
+      "aliases": [
+        "Vガンダム",
+        "ブイガンダム"
+      ]
+    },
+    {
+      "title": "∀ガンダム",
+      "aliases": [
+        "ターンエーガンダム",
+        "ターンエー"
+      ]
+    },
+    {
+      "title": "ガンダム Gのレコンギスタ",
+      "aliases": [
+        "Gのレコンギスタ",
+        "Gレコ"
+      ]
+    },
+    {
+      "title": "伝説巨神イデオン",
+      "aliases": [
+        "イデオン"
+      ]
+    },
+    {
+      "title": "無敵超人ザンボット3",
+      "aliases": [
+        "ザンボット3"
+      ]
+    },
+    {
+      "title": "無敵鋼人ダイターン3",
+      "aliases": [
+        "ダイターン3"
+      ]
+    },
+    {
+      "title": "戦闘メカ ザブングル",
+      "aliases": [
+        "ザブングル"
+      ]
+    },
+    {
+      "title": "聖戦士ダンバイン",
+      "aliases": [
+        "ダンバイン"
+      ]
+    },
+    {
+      "title": "重戦機エルガイム",
+      "aliases": [
+        "エルガイム"
+      ]
+    },
+    {
+      "title": "ブレンパワード",
+      "aliases": []
+    },
+    {
+      "title": "OVERMAN キングゲイナー",
+      "aliases": [
+        "キングゲイナー"
+      ]
+    },
+    {
+      "title": "リーンの翼",
+      "aliases": []
+    },
+    {
+      "title": "海のトリトン",
+      "aliases": []
+    },
+    {
+      "title": "勇者ライディーン",
+      "aliases": [
+        "ライディーン"
+      ]
+    }
+  ]
+}
