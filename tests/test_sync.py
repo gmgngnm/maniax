@@ -1,0 +1,88 @@
+import json
+import tempfile
+import unittest
+from pathlib import Path
+
+from aew.normalize import fingerprint
+from aew.sync import from_db, to_writes
+
+
+class TestFromDb(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.dir = Path(self.tmp.name) / "watchlist"
+        self.dir.mkdir()
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def _doc(self, name, body):
+        (self.dir / f"{name}.json").write_text(
+            json.dumps(body, ensure_ascii=False), encoding="utf-8"
+        )
+
+    def test_splits_works_and_people(self):
+        self._doc("w01", {"kind": "work", "label": "伝説巨神イデオン", "aliases": ["イデオン"]})
+        self._doc("p01", {"kind": "person", "label": "富野由悠季", "role": "監督", "aliases": []})
+        got = from_db(self.dir, None)
+        self.assertEqual(got["works"], [{"title": "伝説巨神イデオン", "aliases": ["イデオン"]}])
+        self.assertEqual(got["people"][0]["name"], "富野由悠季")
+        self.assertEqual(got["people"][0]["role"], "監督")
+
+    def test_missing_kind_defaults_to_work(self):
+        self._doc("x", {"label": "海のトリトン"})
+        self.assertEqual(len(from_db(self.dir, None)["works"]), 1)
+
+    def test_blank_labels_skipped(self):
+        self._doc("blank", {"kind": "work", "label": "   "})
+        got = from_db(self.dir, None)
+        self.assertEqual(got["works"], [])
+
+    def test_settings_carried_over_from_fallback(self):
+        fallback = Path(self.tmp.name) / "watchlist.json"
+        fallback.write_text(
+            json.dumps({"settings": {"max_queries": 12, "include_unmatched": True}}),
+            encoding="utf-8",
+        )
+        self._doc("w01", {"kind": "work", "label": "ブレンパワード"})
+        settings = from_db(self.dir, fallback)["settings"]
+        self.assertEqual(settings["max_queries"], 12)
+        self.assertTrue(settings["include_unmatched"])
+        # 指定のなかった既定値は残る
+        self.assertTrue(settings["drop_past_events"])
+
+
+class TestToWrites(unittest.TestCase):
+    def test_doc_id_matches_dedupe_fingerprint(self):
+        digest = {
+            "items": [
+                {
+                    "title": "イデオン リバイバル上映",
+                    "url": "https://example.com/1",
+                    "summary": "s",
+                    "source": "テスト",
+                    "categories": ["revival"],
+                    "matches": [{"label": "伝説巨神イデオン"}],
+                    "event": {"start": "2026-10-03", "end": None},
+                }
+            ]
+        }
+        writes = to_writes(digest)
+        self.assertEqual(len(writes), 1)
+        self.assertEqual(
+            writes[0]["doc_id"], fingerprint("イデオン リバイバル上映", "https://example.com/1")
+        )
+        self.assertEqual(writes[0]["collection"], "events")
+        self.assertEqual(writes[0]["data"]["start"], "2026-10-03")
+        self.assertIsNone(writes[0]["data"]["end"])
+
+    def test_undated_event_writes_nulls(self):
+        writes = to_writes({"items": [{"title": "T", "url": "u", "event": None}]})
+        self.assertIsNone(writes[0]["data"]["start"])
+
+    def test_empty_digest_yields_no_writes(self):
+        self.assertEqual(to_writes({"items": []}), [])
+
+
+if __name__ == "__main__":
+    unittest.main()

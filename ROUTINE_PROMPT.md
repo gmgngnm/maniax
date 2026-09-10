@@ -4,6 +4,12 @@ Routine が発火するたびに、まっさらなクラウドセッションで
 `create_trigger` に渡しているプロンプトの実体もこの内容。
 手順を変えたいときは、ここと Routine の両方を直すこと。
 
+GUI は Artifact として公開してある:
+<https://claude.ai/code/artifact/de9706cf-f912-4d45-ac25-efa06579b455>
+
+ウォッチリストの正はこの Artifact のデータベース。リポジトリの
+`watchlist.json` はバックアップ兼、DB が読めなかったときの代替。
+
 ---
 
 あなたはアニメのイベント情報を収集して通知する担当。以下を順に実行する。
@@ -15,13 +21,27 @@ test -d /home/user/maniax/.git || git clone https://github.com/gmgngnm/maniax /h
 cd /home/user/maniax && git pull --ff-only
 ```
 
-## 2. 検索クエリを取り出す
+## 2. ウォッチリストを取り出す
+
+Artifact ツールの `read_db` で、上記 URL の `watchlist` コレクションを
+`--out_dir /tmp/db` に読み出す。続けて収集側の形に直す。
 
 ```bash
-cd /home/user/maniax && python3 -m aew.sources --watchlist watchlist.json
+cd /home/user/maniax && python3 -m aew.sync from-db \
+  --dir /tmp/db/watchlist --out /tmp/watchlist.json --fallback watchlist.json
 ```
 
-## 3. 各クエリを WebSearch で検索する
+DB が読めない、または空だった場合はリポジトリの `watchlist.json` を
+そのまま使う（`--out` 先にコピーする）。**空のウォッチリストで巡回しないこと。**
+全作品の監視が黙って止まる。
+
+## 3. 検索クエリを取り出す
+
+```bash
+cd /home/user/maniax && python3 -m aew.sources --watchlist /tmp/watchlist.json
+```
+
+## 4. 各クエリを WebSearch で検索する
 
 - 出力された全クエリを WebSearch にかける（独立しているので並列で投げてよい）。
 - **重要**: この環境では WebFetch と curl による個別サイトへのアクセスが
@@ -34,36 +54,53 @@ cd /home/user/maniax && python3 -m aew.sources --watchlist watchlist.json
 [{"title": "...", "url": "...", "summary": "...", "source": "...", "published": "2026-09-10"}]
 ```
 
-## 4. 突き合わせる
+## 5. 突き合わせる
 
 ```bash
 cd /home/user/maniax && python3 -m aew.ingest \
-  --watchlist watchlist.json --state state/seen.json \
+  --watchlist /tmp/watchlist.json --state state/seen.json \
   --candidates /tmp/candidates.json --out /tmp/digest.json --commit
 ```
 
-`/tmp/digest.json` の `count` が 0 なら**何も通知せず**、手順 6 の
-コミットだけ行って終了する。無風の日に通知を送ると、通知そのものを
-見なくなってしまう。
+`/tmp/digest.json` の `count` が 0 なら**通知も DB 書き込みも行わず**、
+手順 8 のコミットだけ行って終了する。無風の日に通知を送ると、
+通知そのものを見なくなってしまう。
 
-## 5. 通知する
+## 6. GUI に反映する
+
+```bash
+cd /home/user/maniax && python3 -m aew.sync to-writes \
+  --digest /tmp/digest.json --out /tmp/writes.json
+```
+
+`/tmp/writes.json` の中身を Artifact ツールの `write_db`（`db_op: "batch"`）で
+上記 URL に書き込む。`doc_id` は収集側の重複判定と同じ値なので、
+同じイベントを拾い直しても行は増えず上書きになる。
+50 件を超える場合は 50 件ずつに分けて送る。
+
+## 7. 通知する
 
 `digest.json` の中身をそのまま使う。文面を作り直さないこと。
 
 - **メール**: Gmail で `gao2stego@gmail.com` 宛に送る。
   件名は `email_subject`、本文は `email_body`。
 - **カレンダー**: `calendar_events` の各要素を終日予定として登録する。
-  確定日程のものだけに絞ってある。終日予定として登録し、終了日には
-  `end_date_exclusive`（Google カレンダーの終日予定は終了日が排他的
-  なので、その分ずらした値）をそのまま渡す。
+  開始日は `start_date`、終了日は `end_date_exclusive`（Google カレンダーの
+  終日予定は終了日が排他的なので、その分ずらして計算済みの値）を渡す。
 - **Push 通知**: `push` の文字列をそのまま送る。
 
-## 6. 状態をコミットする
+Gmail や Google カレンダーのツールが使えない場合は、無理に代替手段を探さず、
+その旨をはっきり報告したうえで `email_body` の内容を回答本文に全文書き出す。
+GUI への書き込み（手順 6）は成功していれば、情報自体は失われない。
+
+## 8. 状態をコミットする
 
 ```bash
 cd /home/user/maniax
-git add state/seen.json
-git diff --cached --quiet || git commit -m "state: $(date +%Y-%m-%d) の巡回結果を記録"
+cp /tmp/watchlist.json watchlist.json   # GUI 側の変更をリポジトリにも残す
+git add state/seen.json watchlist.json
+git diff --cached --quiet || git -c user.email=gao2stego@gmail.com -c user.name="Osakaya" \
+  commit -m "state: $(date +%Y-%m-%d) の巡回結果を記録"
 git push origin main
 ```
 

@@ -3,6 +3,9 @@
 アニメ作品のリバイバル上映・舞台挨拶・原画展・ライブ情報を定期的に集めて、
 メール / Google カレンダー / スマホ通知に流すウォッチャー。
 
+**GUI（スマホ可）**: <https://claude.ai/code/artifact/de9706cf-f912-4d45-ac25-efa06579b455>
+— 予定の一覧、月カレンダー、監視リストの追加・削除。
+
 「気づいたときには上映が終わっていた」を防ぐのが目的なので、
 **通知しすぎないこと**を優先している。ウォッチリストに載っていない作品は
 既定では通知しないし、日程が既に終わったイベントも落とす。
@@ -13,20 +16,29 @@ Routine（定期トリガー）が毎回まっさらなクラウドセッショ�
 [ROUTINE_PROMPT.md](ROUTINE_PROMPT.md) の手順を実行する。
 
 ```
-watchlist.json ──> aew.sources ──> 検索クエリ
-                                      │
-                                      ▼
-                              WebSearch（セッションが実行）
-                                      │
-                                      ▼  candidates.json
-                              aew.ingest ──> digest.json ──> メール / カレンダー / Push
-                                      │
-                                      ▼
-                              state/seen.json（git で永続化）
+        GUI（Artifact）
+     ┌──── watchlist ────┐                    ┌──── events ────┐
+     │  作品・監督の登録  │                    │   予定・カレンダー │
+     └─────────┬─────────┘                    └────────▲────────┘
+               │ read_db                               │ write_db
+               ▼                                       │
+        aew.sync from-db ──> aew.sources ──> 検索クエリ  │
+                                                │       │
+                                                ▼       │
+                                    WebSearch（セッションが実行）
+                                                │       │
+                                                ▼ candidates.json
+                                    aew.ingest ──> digest.json ──┤
+                                                │                 │
+                                                │                 └──> メール / カレンダー / Push
+                                                ▼
+                                    state/seen.json（git で永続化）
 ```
 
-コンテナは実行のたびに消えるので、「通知済み」の記録は
-`state/seen.json` に置いて git で持ち回っている。
+コンテナは実行のたびに消えるので、状態は 2 か所に外出ししている。
+**ウォッチリストと表示用のイベント**は Artifact のデータベース（GUI が読み書きする正）、
+**「通知済み」の重複判定**は `state/seen.json` を git で持ち回る。
+`watchlist.json` は DB のバックアップ兼、DB が読めなかったときの代替。
 
 ## モジュール
 
@@ -39,11 +51,16 @@ watchlist.json ──> aew.sources ──> 検索クエリ
 | `aew/digest.py` | メール本文・Push 文言・カレンダー登録内容の組み立て |
 | `aew/ingest.py` | 上記をつなぐ CLI |
 | `aew/sources.py` | 情報源と検索クエリの定義 |
+| `aew/sync.py` | GUI のデータベースと収集パイプラインの相互変換 |
 | `aew/collect_rss.py` | RSS 直読み経路（下記の制約あり） |
 
 ## ウォッチリストを変える
 
-`watchlist.json` を編集して push するだけ。次回の実行から反映される。
+**通常は GUI から**。「監視リスト」タブで作品・人物を追加／削除すれば、
+次の朝の巡回から反映される。リポジトリを触る必要はない。
+
+`watchlist.json` を直接編集して push しても動く（DB が読めなかったときの
+代替として使われる）。書式は次のとおり。
 
 ```json
 {

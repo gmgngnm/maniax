@@ -77,8 +77,13 @@ def _main() -> None:
     args = parser.parse_args()
 
     with open(args.watchlist, encoding="utf-8") as handle:
-        for query in queries_for(json.load(handle)):
+        queries = queries_for(json.load(handle))
+    try:
+        for query in queries:
             print(query)
+    except BrokenPipeError:
+        # `| head` などで受け側が先に閉じただけ。異常ではない。
+        pass
 
 
 if __name__ == "__main__":
