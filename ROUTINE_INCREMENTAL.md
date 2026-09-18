@@ -31,6 +31,17 @@ cron は `0 0-22 * * *` にしてある。理由が 2 つある。
 | watchlist に `searched: false` の項目がある | 差分モード（その項目だけ） |
 | どちらでもない | 即終了。clone もコミットも通知もしない |
 
+## 本文照合も通す
+
+`ingest` のあと、必ず次を実行する。
+
+```bash
+cd /home/user/maniax && python3 -m aew.confirm --digest /tmp/digest.json --out /tmp/digest.json
+```
+
+本文が読めれば、スニペットに無い年を本文から取って日付を訂正する。
+読めない環境では「本文未取得」と記録するだけで何も壊さない。
+
 ## 印の付け替えを飛ばさない
 
 新着が 0 件でも、`searched: true` の書き戻しと `control/rescan` のリセットは
