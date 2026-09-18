@@ -36,10 +36,9 @@ WEEKDAY_CHARS = "月火水木金土日"
 _DURATION = re.compile(r"(?P<n>\d{1,2})\s*(?P<unit>週間|日間|ヶ月|か月|カ月)")
 
 
-# 年を補ってよい窓。記事の公開日から見て、この範囲に収まる年だけを採る。
-# 告知は開催の直前〜1年前に出るので、これより広げる理由がない。
-INFER_BACK_DAYS = 31
-INFER_FORWARD_DAYS = 365
+# 年を補ってよい範囲。記事の公開日からこれ以上離れる年は採らない。
+# 告知は開催の数日〜数ヶ月前後に出るので、これより広げる理由がない。
+INFER_MAX_DISTANCE_DAYS = 300
 
 
 def weekday_matches(value: date, weekday: str | None) -> bool:
@@ -53,32 +52,46 @@ def _infer_year(month: int, day: int, ref: date | None,
                 weekday: str | None = None) -> int | None:
     """年の指定がないときに、記事の公開日から年を割り出す。
 
-    基準が無ければ None を返す（推測しない）。基準があっても、窓から
-    外れる年しか作れないなら None を返す。「未来側に倒す」ことはしない。
+    基準が無ければ None を返す（推測しない）。
 
-    曜日注記があれば、それに合う年を選ぶ。「10/3(金)」は 2025 年なら
-    金曜、2026 年なら土曜なので、これだけで年が決まることがある。
-    合う年が窓の中に無ければ、読み取りを諦める。
+    **公開日に最も近い年を採る。** 日本語の文章は、同じ年の話なら年を
+    省く。2025 年 9 月の投稿にある「5月」は、翌年ではなくその年の 5 月を
+    指していることが多い。以前は未来側に倒していたため、これを 2026 年 5 月と
+    読んでしまっていた。
+
+    年をまたぐ場合も自然に扱える。12 月の投稿にある「1月5日」は、
+    同じ年の 1 月（11 ヶ月前）より翌年の 1 月（半月後）の方が近いので、
+    翌年が選ばれる。
+
+    曜日注記があればそれを最優先する。「10/3(金)」は 2025 年なら金曜、
+    2026 年なら土曜なので、これだけで年が決まる。合う年が範囲内に
+    無ければ、出典と食い違う日付を出すより読み取りを諦める。
     """
     if ref is None:
         return None
-    low = ref - timedelta(days=INFER_BACK_DAYS)
-    high = ref + timedelta(days=INFER_FORWARD_DAYS)
-    fallback = None
-    for year in (ref.year, ref.year + 1):
+
+    best_key = None
+    best_year = None
+    best_matches = False
+    for year in (ref.year - 1, ref.year, ref.year + 1):
         try:
             candidate = date(year, month, day)
         except ValueError:
             continue
-        if not (low <= candidate <= high):
+        distance = abs((candidate - ref).days)
+        if distance > INFER_MAX_DISTANCE_DAYS:
             continue
-        if weekday_matches(candidate, weekday):
-            return year
-        if fallback is None:
-            fallback = year
-    # 曜日が指定されているのに、窓の中のどの年とも合わない。
-    # 出典と食い違う日付を出すより、出さない方がよい。
-    return None if weekday else fallback
+        matches = weekday_matches(candidate, weekday)
+        # 曜日一致を最優先、次に公開日への近さ、同点なら同じ年を選ぶ
+        key = (0 if matches else 1, distance, 0 if year == ref.year else 1)
+        if best_key is None or key < best_key:
+            best_key, best_year, best_matches = key, year, matches
+
+    if best_year is None:
+        return None
+    if weekday and not best_matches:
+        return None
+    return best_year
 
 
 def _read_date(text: str, pos: int, ref: date | None):

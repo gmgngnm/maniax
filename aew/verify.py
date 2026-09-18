@@ -55,7 +55,7 @@ def is_stale(published: date | None, today: date,
 
 
 def assess(start: date | None, published: date | None, today: date,
-           year_was_explicit: bool) -> Verdict:
+           year_was_explicit: bool, end: date | None = None) -> Verdict:
     """この日付を予定として出してよいかを判定する。"""
     if start is None:
         return Verdict(False, "日付が読み取れない")
@@ -71,7 +71,10 @@ def assess(start: date | None, published: date | None, today: date,
         return Verdict(False, f"記事が古い（{(today - published).days}日前）")
 
     if start < published - timedelta(days=MAX_BACKDATE_DAYS):
-        return Verdict(False, "記事の公開日より前の日付（過去の出来事への言及）")
+        # ただし会期がまだ続いているなら、開催中の長期イベントの記事。
+        # 原画展のように数ヶ月続くものは、始まってから記事が出ることもある。
+        if not (end and end >= today):
+            return Verdict(False, "記事の公開日より前の日付（過去の出来事への言及）")
 
     if start > published + timedelta(days=MAX_LEAD_DAYS):
         return Verdict(False, "記事の公開日から離れすぎている（年の取り違えの疑い）")

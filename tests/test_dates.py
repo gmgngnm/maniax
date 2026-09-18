@@ -51,3 +51,37 @@ class TestDates(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestNearestYear(unittest.TestCase):
+    """年の書かれていない日付は、公開日に最も近い年として読む。
+
+    日本語の文章は同じ年の話なら年を省く。2025 年の投稿にある「5月」は
+    その年の 5 月を指すのが自然で、翌年ではない。
+    """
+
+    def test_same_year_preferred_for_earlier_month(self):
+        got = primary_range("5月10日に開催", date(2025, 9, 1))
+        self.assertEqual(got["start"], "2025-05-10")
+
+    def test_year_rollover_forward(self):
+        # 12 月の投稿の「1月5日」は翌年の方が近い
+        got = primary_range("1月5日より上映", date(2025, 12, 20))
+        self.assertEqual(got["start"], "2026-01-05")
+
+    def test_year_rollover_backward(self):
+        # 1 月の投稿の「12月24日」は前年の方が近い
+        got = primary_range("12月24日に実施", date(2026, 1, 15))
+        self.assertEqual(got["start"], "2025-12-24")
+
+    def test_far_month_beyond_window_rejected(self):
+        # どの年に置いても公開日から離れすぎるケースは無い（最大でも半年）が、
+        # 境界の扱いが壊れていないことだけ確かめる
+        got = primary_range("3月1日より", date(2026, 9, 1))
+        self.assertIsNotNone(got)
+        self.assertIn(got["start"], ("2026-03-01", "2027-03-01"))
+
+    def test_weekday_overrides_proximity(self):
+        # 近さでは 2026 年だが、曜日が合うのは 2025 年
+        got = primary_range("10/3(金)より", date(2026, 1, 10))
+        self.assertEqual(got["start"], "2025-10-03")

@@ -126,3 +126,24 @@ class TestAssess(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestOngoingLongEvents(unittest.TestCase):
+    """公開日より前に始まっていても、会期が続いていれば残す。"""
+
+    def test_ongoing_exhibition_kept(self):
+        verdict = assess(
+            date(2026, 6, 1), date(2026, 9, 10), TODAY, True, end=date(2026, 10, 31)
+        )
+        self.assertTrue(verdict.accepted)
+
+    def test_finished_event_still_rejected(self):
+        verdict = assess(
+            date(2026, 6, 1), date(2026, 9, 10), TODAY, True, end=date(2026, 6, 30)
+        )
+        self.assertFalse(verdict.accepted)
+        self.assertIn("前の日付", verdict.reason)
+
+    def test_no_end_date_still_rejected(self):
+        verdict = assess(date(2026, 6, 1), date(2026, 9, 10), TODAY, True)
+        self.assertFalse(verdict.accepted)

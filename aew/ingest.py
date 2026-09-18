@@ -71,11 +71,17 @@ def run(candidates, watchlist, store: SeenStore, today: date) -> list[dict]:
         start_date = (
             date.fromisoformat(candidate_range["start"]) if candidate_range else None
         )
+        end_date = (
+            date.fromisoformat(candidate_range["end"])
+            if candidate_range and candidate_range.get("end")
+            else None
+        )
         verdict = verify.assess(
             start_date,
             published,
             today,
             bool(candidate_range and candidate_range.get("year_explicit")),
+            end=end_date,
         )
         if verdict.accepted:
             item["event"] = candidate_range
