@@ -31,6 +31,21 @@ cron は `0 0-22 * * *` にしてある。理由が 2 つある。
 | watchlist に `searched: false` の項目がある | 差分モード（その項目だけ） |
 | どちらでもない | 即終了。clone もコミットも通知もしない |
 
+## X（Twitter）を引く
+
+公式アカウントの告知はニュースサイトより早いので、必ず実行する。
+
+```bash
+cd /home/user/maniax && python3 -m aew.sources --watchlist /tmp/watchlist.json --x
+```
+
+出力されたクエリは、WebSearch の `allowed_domains` に
+`["x.com", "twitter.com"]` を指定して投げる。投稿本文が結果のタイトルとして
+そのまま返るので、それを `title` と `snippet` の両方に入れる。
+
+**`published` は空でよい。** status URL の ID から投稿日時が厳密に復元される。
+推測で埋めると、確実な値を上書きしてしまう。
+
 ## 本文照合も通す
 
 `ingest` のあと、必ず次を実行する。

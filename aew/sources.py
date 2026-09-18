@@ -113,6 +113,28 @@ def queries_for(watchlist: dict) -> list[str]:
     return list(dict.fromkeys(out))[:limit]
 
 
+def x_queries_for(watchlist: dict) -> list[str]:
+    """X に絞って投げるクエリ。
+
+    WebSearch の allowed_domains を x.com / twitter.com に絞ると、
+    投稿本文がそのまま返る。公式アカウントの告知はニュースより早いので、
+    ここが最も速報性が高い。
+    """
+    from .xposts import aggregator_queries, work_queries
+
+    settings = watchlist.get("settings", {})
+    limit = settings.get("max_x_queries", 20)
+
+    titles = [w["title"] for w in watchlist.get("works", []) if w.get("title")]
+    names = [p["name"] for p in watchlist.get("people", []) if p.get("name")]
+
+    out = work_queries(titles)
+    out += [f"{n} 上映 OR イベント OR 展" for n in names]
+    if settings.get("venue_queries", True):
+        out += aggregator_queries()
+    return list(dict.fromkeys(out))[:limit]
+
+
 def _main() -> None:
     """watchlist.json から検索クエリを 1 行ずつ出す。
 
@@ -123,10 +145,13 @@ def _main() -> None:
 
     parser = argparse.ArgumentParser(description=_main.__doc__)
     parser.add_argument("--watchlist", default="watchlist.json")
+    parser.add_argument("--x", action="store_true",
+                        help="X に絞って投げるクエリを出す（allowed_domains と併用）")
     args = parser.parse_args()
 
     with open(args.watchlist, encoding="utf-8") as handle:
-        queries = queries_for(json.load(handle))
+        watchlist = json.load(handle)
+    queries = x_queries_for(watchlist) if args.x else queries_for(watchlist)
     try:
         for query in queries:
             print(query)

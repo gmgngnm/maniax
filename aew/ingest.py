@@ -21,6 +21,7 @@ from . import digest
 from .dates import mentions_bare_date, parse_published, primary_range
 from .match import evaluate
 from .store import SeenStore
+from .xposts import published_from_url
 from . import verify
 
 
@@ -48,7 +49,13 @@ def run(candidates, watchlist, store: SeenStore, today: date) -> list[dict]:
         # 年の書かれていない日付は、記事の公開日を基準に解釈する。
         # 今日を基準にすると、古い記事の「9月30日」が来月の予定に化ける。
         # 公開日が分からなければ日付を補わない（primary_range が None を返す）。
-        published = parse_published(item.get("published", ""))
+        # X の status URL は ID に投稿時刻が埋まっている。収集側の申告より
+        # 確実なので、そちらを優先する。X 以外は申告を使う。
+        from_snowflake = published_from_url(item.get("url", ""))
+        if from_snowflake:
+            published = date.fromisoformat(from_snowflake)
+        else:
+            published = parse_published(item.get("published", ""))
         item["published"] = published.isoformat() if published else ""
 
         # 古い記事はニュースではない。候補ごと落とす。

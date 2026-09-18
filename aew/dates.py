@@ -24,8 +24,13 @@ _FULL = re.compile(
 # 範囲の右側が「24日」のように日だけのケース
 _DAY_ONLY = re.compile(r"^\s*(?P<d>\d{1,2})\s*日")
 _RANGE_SEP = re.compile(r"^\s*(?:[~〜～\-‐‑‒–—―]|から|より)\s*")
-# 「(金)」のような曜日注記は日付の一部として読み飛ばす
-_WEEKDAY = re.compile(r"^\s*[（(][日月火水木金土][）)]")
+# 「(金)」のような曜日注記。読み飛ばすだけでなく、年の検算に使う。
+# match(text, pos) 形式で使うのでアンカーを付けない（^ は pos ではなく
+# 文字列先頭にしか当たらず、曜日の検算が黙って素通りする）
+_WEEKDAY = re.compile(r"\s*[（(](?P<w>[日月火水木金土])[）)]")
+
+# date.weekday() は月曜が 0
+WEEKDAY_CHARS = "月火水木金土日"
 
 # 「1週間限定」「3日間限定」— 終了日の推定に使う
 _DURATION = re.compile(r"(?P<n>\d{1,2})\s*(?P<unit>週間|日間|ヶ月|か月|カ月)")
@@ -37,24 +42,43 @@ INFER_BACK_DAYS = 31
 INFER_FORWARD_DAYS = 365
 
 
-def _infer_year(month: int, day: int, ref: date | None) -> int | None:
+def weekday_matches(value: date, weekday: str | None) -> bool:
+    """「(金)」のような曜日注記と実際の曜日が合うか。注記が無ければ真。"""
+    if not weekday:
+        return True
+    return WEEKDAY_CHARS[value.weekday()] == weekday
+
+
+def _infer_year(month: int, day: int, ref: date | None,
+                weekday: str | None = None) -> int | None:
     """年の指定がないときに、記事の公開日から年を割り出す。
 
     基準が無ければ None を返す（推測しない）。基準があっても、窓から
     外れる年しか作れないなら None を返す。「未来側に倒す」ことはしない。
+
+    曜日注記があれば、それに合う年を選ぶ。「10/3(金)」は 2025 年なら
+    金曜、2026 年なら土曜なので、これだけで年が決まることがある。
+    合う年が窓の中に無ければ、読み取りを諦める。
     """
     if ref is None:
         return None
     low = ref - timedelta(days=INFER_BACK_DAYS)
     high = ref + timedelta(days=INFER_FORWARD_DAYS)
+    fallback = None
     for year in (ref.year, ref.year + 1):
         try:
             candidate = date(year, month, day)
         except ValueError:
             continue
-        if low <= candidate <= high:
+        if not (low <= candidate <= high):
+            continue
+        if weekday_matches(candidate, weekday):
             return year
-    return None
+        if fallback is None:
+            fallback = year
+    # 曜日が指定されているのに、窓の中のどの年とも合わない。
+    # 出典と食い違う日付を出すより、出さない方がよい。
+    return None if weekday else fallback
 
 
 def _read_date(text: str, pos: int, ref: date | None):
@@ -68,18 +92,27 @@ def _read_date(text: str, pos: int, ref: date | None):
     month, day = int(m.group("m")), int(m.group("d"))
     if not (1 <= month <= 12 and 1 <= day <= 31):
         return None, False, pos
+
+    end = m.end()
+    wd_match = _WEEKDAY.match(text, end)
+    weekday = wd_match.group("w") if wd_match else None
+    if wd_match:
+        end = wd_match.end()
+
     explicit = m.group("y") is not None
-    year = int(m.group("y")) if explicit else _infer_year(month, day, ref)
+    year = int(m.group("y")) if explicit else _infer_year(month, day, ref, weekday)
     if year is None:
         return None, False, pos
     try:
         value = date(year, month, day)
     except ValueError:
         return None, False, pos
-    end = m.end()
-    wd = _WEEKDAY.match(text, end)
-    if wd:
-        end = wd.end()
+
+    # 年が明示されていても、曜日が合わなければ信用しない。
+    # 収集側が年を書き足したときにここで露見する。
+    if not weekday_matches(value, weekday):
+        return None, False, pos
+
     return value, explicit, end
 
 
