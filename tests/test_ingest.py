@@ -62,7 +62,7 @@ class TestIngest(unittest.TestCase):
             {
                 "title": "イデオン原画展 開催決定",
                 "url": "https://example.com/2",
-                "summary": "会期は11月1日～11月30日",
+                "summary": "会期は2026年11月1日～11月30日",
             }
         ]
         again = self._run(dated)
@@ -195,12 +195,28 @@ class TestPublishedAsReference(unittest.TestCase):
         items = run(candidates, watchlist, SeenStore(self.state), TODAY)
         self.assertEqual(items[0]["event"]["start"], "2026-06-05")
 
-    def test_falls_back_to_today_without_published(self):
+    def test_no_date_invented_without_published(self):
+        # 公開日が分からない記事の「10月3日」は、今年とも来年とも決められない。
+        # 以前はここで今日を基準に補い、古い記事の日付を未来に化けさせていた。
         candidates = [
             {
                 "title": "イデオン リバイバル上映決定",
                 "url": "https://example.com/nopub",
                 "summary": "10月3日より上映",
+            }
+        ]
+        items = run(candidates, WATCHLIST, SeenStore(self.state), TODAY)
+        self.assertEqual(len(items), 1)
+        self.assertIsNone(items[0]["event"])
+        self.assertIn("年", items[0]["date_note"])
+
+    def test_explicit_year_accepted_without_published(self):
+        # 出典に年がはっきり書いてあるなら、公開日が無くても通す
+        candidates = [
+            {
+                "title": "イデオン リバイバル上映決定",
+                "url": "https://example.com/explicit",
+                "summary": "2026年10月3日より上映",
             }
         ]
         items = run(candidates, WATCHLIST, SeenStore(self.state), TODAY)

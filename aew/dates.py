@@ -3,6 +3,12 @@
 「2026年9月18日(金)より1週間限定」「9月18日～24日」「2026/10/23公開」など、
 ニュース見出しと本文冒頭に出てくる書き方をひととおり拾えれば十分とする。
 カレンダー登録に使うので、取り違えるより拾わない方が安全（拾えなければ None）。
+
+**年を勝手に補わないこと。** 以前は「年の指定がなければ未来側に倒す」
+実装になっており、2022年の記事にあった「9月30日」を 2026-09-30 と読んで、
+終わった上映を未来の予定として通知する事故を起こした。年が書かれていない
+日付は、記事の公開日という基準がある場合に限り、その前後の狭い窓の中でだけ
+補う。基準が無ければ日付を返さない。
 """
 
 import re
@@ -25,45 +31,65 @@ _WEEKDAY = re.compile(r"^\s*[（(][日月火水木金土][）)]")
 _DURATION = re.compile(r"(?P<n>\d{1,2})\s*(?P<unit>週間|日間|ヶ月|か月|カ月)")
 
 
-def _infer_year(month: int, day: int, ref: date) -> int:
-    """年の指定がないとき、基準日から見て最も自然な年を選ぶ。
+# 年を補ってよい窓。記事の公開日から見て、この範囲に収まる年だけを採る。
+# 告知は開催の直前〜1年前に出るので、これより広げる理由がない。
+INFER_BACK_DAYS = 31
+INFER_FORWARD_DAYS = 365
 
-    直近 60 日前までは「今年の過去日」として許容し、それより古くなるなら翌年扱い。
-    上映情報は基本これから先の話なので、未来側に倒す。
+
+def _infer_year(month: int, day: int, ref: date | None) -> int | None:
+    """年の指定がないときに、記事の公開日から年を割り出す。
+
+    基準が無ければ None を返す（推測しない）。基準があっても、窓から
+    外れる年しか作れないなら None を返す。「未来側に倒す」ことはしない。
     """
+    if ref is None:
+        return None
+    low = ref - timedelta(days=INFER_BACK_DAYS)
+    high = ref + timedelta(days=INFER_FORWARD_DAYS)
     for year in (ref.year, ref.year + 1):
         try:
             candidate = date(year, month, day)
         except ValueError:
             continue
-        if candidate >= ref - timedelta(days=60):
+        if low <= candidate <= high:
             return year
-    return ref.year
+    return None
 
 
-def _read_date(text: str, pos: int, ref: date):
-    """text[pos:] の先頭から日付を1つ読む。(date, 次の位置) か (None, pos)。"""
+def _read_date(text: str, pos: int, ref: date | None):
+    """text[pos:] の先頭から日付を1つ読む。(date, 年が明示か, 次の位置)。
+
+    読めなければ (None, False, pos)。
+    """
     m = _FULL.match(text, pos)
     if not m:
-        return None, pos
+        return None, False, pos
     month, day = int(m.group("m")), int(m.group("d"))
     if not (1 <= month <= 12 and 1 <= day <= 31):
-        return None, pos
-    year = int(m.group("y")) if m.group("y") else _infer_year(month, day, ref)
+        return None, False, pos
+    explicit = m.group("y") is not None
+    year = int(m.group("y")) if explicit else _infer_year(month, day, ref)
+    if year is None:
+        return None, False, pos
     try:
         value = date(year, month, day)
     except ValueError:
-        return None, pos
+        return None, False, pos
     end = m.end()
     wd = _WEEKDAY.match(text, end)
     if wd:
         end = wd.end()
-    return value, end
+    return value, explicit, end
 
 
 def _read_end_day(text: str, pos: int, start: date):
-    """範囲の右側。「9月24日」でも「24日」でも受ける。"""
-    value, end = _read_date(text, pos, start)
+    """範囲の右側。「9月24日」でも「24日」でも受ける。
+
+    終了日は開始日を基準に読む。開始日が確定している以上、
+    ここで年を補うのは推測ではなく範囲の解釈。
+    """
+    value, _, end = _read_date(text, pos, start)
     if value is not None:
         return value, end
     m = _DAY_ONLY.match(text[pos:])
@@ -80,18 +106,22 @@ def _read_end_day(text: str, pos: int, start: date):
 def extract_ranges(text: str, ref: date | None = None) -> list[dict]:
     """テキスト中の日付・日付範囲をすべて返す。
 
-    返り値は {"start": "YYYY-MM-DD", "end": "YYYY-MM-DD" or None, "raw": str}。
+    返り値は {"start", "end", "raw", "year_explicit"}。
     end は範囲が明示されているか期間が書かれている場合のみ埋まる。
+    year_explicit は、出典に 4 桁の年が書かれていたかどうか。呼び出し側が
+    この日付をどれだけ信用してよいかの判断に使う。
+
+    ref（記事の公開日）を渡さない場合、年の書かれていない日付は
+    読み飛ばす。今日を基準に補うと、古い記事の日付が未来に化ける。
     """
     if not text:
         return []
-    ref = ref or date.today()
     text = unicodedata.normalize("NFKC", text)
 
     found: list[dict] = []
     pos = 0
     while pos < len(text):
-        start, after = _read_date(text, pos, ref)
+        start, explicit, after = _read_date(text, pos, ref)
         if start is None:
             pos += 1
             continue
@@ -110,6 +140,7 @@ def extract_ranges(text: str, ref: date | None = None) -> list[dict]:
                 "start": start.isoformat(),
                 "end": end_date.isoformat() if end_date else None,
                 "raw": text[raw_start:after].strip(),
+                "year_explicit": explicit,
             }
         )
         pos = after
@@ -160,3 +191,20 @@ def parse_published(value: str):
     # 「2026年8月26日」形式や、URL 由来の日付も拾えるようにしておく
     found = extract_ranges(text, date(2000, 1, 1))
     return date.fromisoformat(found[0]["start"]) if found else None
+
+
+def mentions_bare_date(text: str) -> str | None:
+    """年の書かれていない日付らしき記述があれば、その文字列を返す。
+
+    年を解決できずに読み飛ばしたとき、「日付が無い」のか「年が無い」のかを
+    区別して伝えるために使う。利用者が出典を自分で確かめる手がかりにもなる。
+    """
+    if not text:
+        return None
+    for m in _FULL.finditer(unicodedata.normalize("NFKC", text)):
+        if m.group("y"):
+            continue
+        month, day = int(m.group("m")), int(m.group("d"))
+        if 1 <= month <= 12 and 1 <= day <= 31:
+            return m.group(0).strip()
+    return None

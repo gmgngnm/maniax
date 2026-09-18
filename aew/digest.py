@@ -27,7 +27,7 @@ def _format_period(item: dict) -> str:
     event = item.get("event") or {}
     start, end = event.get("start"), event.get("end")
     if not start:
-        return "日程未定"
+        return "日程未確認" if item.get("date_note") else "日程未定"
     if end and end != start:
         return f"{_jp(start)}〜{_jp(end)}"
     return _jp(start)
@@ -72,6 +72,11 @@ def email_body(items: list[dict], today: date) -> str:
         lines.append(f"   {_labels(item)}")
         if item.get("summary"):
             lines.append(f"   {item['summary'][:120]}")
+        if item.get("date_note"):
+            # 日付を出さなかった理由は隠さない。記事を見れば分かる場合もある。
+            hint = item.get("date_hint")
+            shown = f"「{hint}」とあるが未確認" if hint else "日付なし"
+            lines.append(f"   ※ 日程は載せていません（{item['date_note']}）: {shown}")
         if item.get("url"):
             lines.append(f"   {item['url']}")
         lines.append("")
@@ -79,7 +84,8 @@ def email_body(items: list[dict], today: date) -> str:
     undated = [i for i in items if not (i.get("event") or {}).get("start")]
     if undated:
         lines.append(
-            f"※ うち{len(undated)}件は日程が未確定です。判明した時点で再通知します。"
+            f"※ うち{len(undated)}件は日程を載せていません。出典に年の記載が無いなど、"
+            "裏の取れない日付は誤りのもとなので出さない方針です。判明した回に再通知します。"
         )
     return "\n".join(lines)
 

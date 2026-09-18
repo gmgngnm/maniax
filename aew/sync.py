@@ -112,6 +112,9 @@ def to_writes(digest: dict) -> list[dict]:
                     "matches": item.get("matches", []),
                     "start": event.get("start"),
                     "end": event.get("end"),
+                    "published": item.get("published", ""),
+                    "dateNote": item.get("date_note", ""),
+                    "dateHint": item.get("date_hint", ""),
                 },
             }
         )
