@@ -174,11 +174,23 @@ class TestPending(unittest.TestCase):
         # set だと label や aliases を消してしまう
         self.assertNotIn("label", writes[0]["data"])
 
-    def test_pending_entries_still_produce_queries(self):
+    def test_pending_entries_produce_only_their_own_queries(self):
+        # 差分巡回は追加された作品だけを引く。劇場側の固定クエリは
+        # 追加作品と無関係なので、毎時走らせない。
         from aew.sources import queries_for
         from aew.sync import from_db
 
         self._doc("w02", {"kind": "work", "label": "リーンの翼", "searched": False})
-        queries = queries_for(from_db(self.dir, None, pending_only=True))
+        watchlist = from_db(self.dir, None, pending_only=True)
+        self.assertFalse(watchlist["settings"]["venue_queries"])
+        queries = queries_for(watchlist)
         self.assertTrue(all("リーンの翼" in q for q in queries))
         self.assertEqual(len(queries), 3)
+
+    def test_full_run_includes_venue_queries(self):
+        from aew.sources import VENUE_QUERIES, queries_for
+        from aew.sync import from_db
+
+        self._doc("w02", {"kind": "work", "label": "リーンの翼", "searched": True})
+        queries = queries_for(from_db(self.dir, None))
+        self.assertIn(VENUE_QUERIES[0], queries)

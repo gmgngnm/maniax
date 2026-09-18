@@ -66,6 +66,16 @@ cd /home/user/maniax && python3 -m aew.ingest \
 手順 8 のコミットだけ行って終了する。無風の日に通知を送ると、
 通知そのものを見なくなってしまう。
 
+## 本文で日付の裏を取る
+
+```bash
+cd /home/user/maniax && python3 -m aew.confirm --digest /tmp/digest.json --out /tmp/digest.json
+```
+
+記事本文が読める環境なら、スニペットに無い年を本文から取って日付を訂正する。
+読めない環境（現状）では各件を「本文未取得」と記録するだけで、
+スニペット段階の判定をそのまま残す。**どちらでも失敗しないので必ず実行する。**
+
 ## 6. GUI に反映する
 
 ```bash

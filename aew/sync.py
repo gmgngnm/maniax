@@ -27,7 +27,7 @@ DEFAULT_SETTINGS = {
     "categories": ["revival", "screening_event", "exhibition", "concert"],
     "include_unmatched": False,
     "drop_past_events": True,
-    "max_queries": 60,
+    "max_queries": 80,
 }
 
 
@@ -63,12 +63,16 @@ def from_db(doc_dir: Path, fallback: Path | None, pending_only: bool = False) ->
     """read_db --out_dir が吐いた JSON 群を watchlist.json の形に組み直す。
 
     pending_only を立てると、まだ検索していないエントリだけを拾う。
-    追加直後の作品を翌朝まで待たずに検索するために使う。
+    追加直後の作品を翌朝まで待たずに検索するために使う。このとき
+    劇場側からの探索は外す。追加された作品とは無関係な固定クエリで、
+    毎時走らせても同じ結果を引き直すだけだから。
     """
     settings = dict(DEFAULT_SETTINGS)
     if fallback and fallback.exists():
         existing = json.loads(fallback.read_text(encoding="utf-8"))
         settings.update(existing.get("settings", {}))
+    if pending_only:
+        settings["venue_queries"] = False
 
     works, people = [], []
     for path in sorted(Path(doc_dir).glob("*.json")):

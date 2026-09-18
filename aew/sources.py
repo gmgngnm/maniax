@@ -6,6 +6,7 @@ RSS 経路（collect_rss）で読むフィードと、WebSearch 経路で使う�
 
 # ネットワーク許可が下りたら collect_rss がここを読む。
 # 現状この環境の egress ポリシーではいずれも 403 で塞がっている。
+# 到達できるかは `python3 -m aew.preflight` で確認する。
 RSS_FEEDS = [
     {"name": "コミックナタリー", "url": "https://natalie.mu/comic/feed/news"},
     {"name": "映画ナタリー", "url": "https://natalie.mu/eiga/feed/news"},
@@ -15,6 +16,34 @@ RSS_FEEDS = [
     {"name": "アニメイトタイムズ", "url": "https://www.animatetimes.com/rss/"},
     {"name": "リスアニ！", "url": "https://www.lisani.jp/feed/"},
     {"name": "MOVIE WALKER PRESS", "url": "https://moviewalker.jp/rss/news.rdf"},
+    {"name": "電撃ホビーウェブ", "url": "https://hobby.dengeki.com/feed/"},
+    {"name": "アキバ総研アニメ", "url": "https://akiba-souken.com/rss/anime/"},
+    {"name": "ファミ通.com", "url": "https://www.famitsu.com/rss/fcom_all.rdf"},
+    {"name": "アニメハック", "url": "https://anime.eiga.com/rss/news/"},
+    {"name": "PR TIMES", "url": "https://prtimes.jp/index.rdf"},
+]
+
+# YouTube はチャンネル ID さえ分かれば認証なしで Atom フィードが読める。
+#   https://www.youtube.com/feeds/videos.xml?channel_id=<ID>
+# ID を直に書くと間違いが混ざるので、ハンドルだけ持っておき、
+# 実行時に aew.youtube が解決する。解決できないものは黙って飛ばす。
+YOUTUBE_HANDLES = [
+    {"name": "ガンダムチャンネル", "handle": "@gundaminfo"},
+    {"name": "サンライズ", "handle": "@SUNRISE_Anime"},
+    {"name": "アニプレックス", "handle": "@aniplexUS"},
+    {"name": "東宝MOVIEチャンネル", "handle": "@TOHOmovie"},
+    {"name": "松竹", "handle": "@shochikuchannel"},
+    {"name": "KADOKAWAanime", "handle": "@KADOKAWAanime"},
+]
+
+# リバイバル上映の一次情報が最初に出る劇場。RSS は無いので HTML を読む。
+THEATER_PAGES = [
+    {"name": "新文芸坐", "url": "https://www.shin-bungeiza.com/schedule"},
+    {"name": "塚口サンサン劇場", "url": "https://www.sunsun3.jp/"},
+    {"name": "早稲田松竹", "url": "https://www.wasedashochiku.co.jp/"},
+    {"name": "目黒シネマ", "url": "https://www.okura-movie.co.jp/meguro_cinema/"},
+    {"name": "シネマート新宿", "url": "https://www.cinemart.co.jp/theater/shinjuku/"},
+    {"name": "シネマスコーレ", "url": "http://www.cinemaskhole.co.jp/"},
 ]
 
 # WebSearch 経路のクエリ。{term} にウォッチリストの作品名・人物名が入る。
@@ -34,6 +63,20 @@ BROAD_QUERIES = [
     "アニメ リバイバル上映 決定",
     "劇場アニメ 応援上映 爆音上映 決定",
     "アニメ 原画展 開催 決定",
+]
+
+# 劇場・企画の側から引く。作品名を知らなくても、そこに並ぶ演目に
+# ウォッチリストの作品が混ざっていれば match.py が拾う。
+# 「作品名で引く」だけでは届かない旧作の特集上映に効く。
+VENUE_QUERIES = [
+    "新文芸坐 特集上映 スケジュール アニメ",
+    "塚口サンサン劇場 上映作品 アニメ",
+    "早稲田松竹 特集上映",
+    "シネマート新宿 アニメ 特集上映",
+    "Filmarks リバイバル上映プロジェクト 新着",
+    "午前十時の映画祭 アニメ ラインナップ",
+    "4Kリマスター 劇場公開 決定 アニメ",
+    "35mmフィルム 上映 アニメ 特集",
 ]
 
 
@@ -57,6 +100,9 @@ def queries_for(watchlist: dict) -> list[str]:
     for template in WORK_QUERY_TEMPLATES:
         rounds.append([template.format(term=t) for t in works])
     rounds.append([f"{n} 展示会 トークショー 登壇" for n in people])
+    # 劇場側からの探索は作品数に関係なく一定本数なので、常に入れる
+    if settings.get("venue_queries", True):
+        rounds.append(list(VENUE_QUERIES))
     if settings.get("include_unmatched"):
         rounds.append(list(BROAD_QUERIES))
 
