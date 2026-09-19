@@ -57,6 +57,22 @@ cd /home/user/maniax && python3 -m aew.confirm --digest /tmp/digest.json --out /
 本文が読めれば、スニペットに無い年を本文から取って日付を訂正する。
 読めない環境では「本文未取得」と記録するだけで何も壊さない。
 
+## GUI への書き戻しは merge-existing を使う
+
+`to-writes` ではなく `merge-existing`。新着を既存の行とも突き合わせ、
+同じ催しなら 1 行に畳む。`to-writes` は 1 回の巡回の中でしかまとめられず、
+別の日に別の媒体が同じ催しを報じると 2 行目ができる（実際、小田原の
+展覧会が後日 X 経由で 2 行目になった）。
+
+```bash
+cd /home/user/maniax && python3 -m aew.sync merge-existing \
+  --existing-dir /tmp/db/events --versions /tmp/versions.json \
+  --digest /tmp/digest.json --out /tmp/writes.json
+```
+
+`--versions` は `{"doc_id": version}` の JSON。`read_db` の `list` 出力に
+各行の version が出ているので、そこから作る。
+
 ## 印の付け替えを飛ばさない
 
 新着が 0 件でも、`searched: true` の書き戻しと `control/rescan` のリセットは
