@@ -1,7 +1,7 @@
 import unittest
 from datetime import date
 
-from aew.dates import extract_ranges, primary_range
+from aew.dates import extract_ranges, primary_range, published_from_path
 
 REF = date(2026, 9, 10)
 
@@ -85,3 +85,35 @@ class TestNearestYear(unittest.TestCase):
         # 近さでは 2026 年だが、曜日が合うのは 2025 年
         got = primary_range("10/3(金)より", date(2026, 1, 10))
         self.assertEqual(got["start"], "2025-10-03")
+
+
+class TestPublishedFromPath(unittest.TestCase):
+    """URL に埋まった公開日を拾う。収集側が拾い損ねたときの保険。"""
+
+    TODAY = date(2026, 9, 19)
+
+    def test_slash_separated_path(self):
+        self.assertEqual(
+            published_from_path("https://animeanime.jp/article/2026/08/26/102377.html", self.TODAY),
+            date(2026, 8, 26),
+        )
+
+    def test_compact_date_in_path(self):
+        self.assertEqual(
+            published_from_path("https://example.com/news/20260215-abc", self.TODAY),
+            date(2026, 2, 15),
+        )
+
+    def test_article_id_is_not_a_date(self):
+        self.assertIsNone(published_from_path("https://amass.jp/182382/", self.TODAY))
+        self.assertIsNone(published_from_path("https://natalie.mu/comic/news/684330", self.TODAY))
+
+    def test_invalid_date_rejected(self):
+        self.assertIsNone(published_from_path("https://example.com/id/20261234", self.TODAY))
+
+    def test_future_date_rejected(self):
+        # 公開日が未来になることはない。記事 ID の偶然の一致を落とす。
+        self.assertIsNone(published_from_path("https://example.com/a/2030/01/01/x", self.TODAY))
+
+    def test_host_digits_ignored(self):
+        self.assertIsNone(published_from_path("https://20260101.example.com/x", self.TODAY))

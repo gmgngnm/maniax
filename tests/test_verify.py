@@ -147,3 +147,45 @@ class TestOngoingLongEvents(unittest.TestCase):
     def test_no_end_date_still_rejected(self):
         verdict = assess(date(2026, 6, 1), date(2026, 9, 10), TODAY, True)
         self.assertFalse(verdict.accepted)
+
+
+class TestUnverifiable(unittest.TestCase):
+    """過去か未来か判定できない項目に印が付くか。"""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.state = Path(self.tmp.name) / "seen.json"
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def _run(self, candidate):
+        return run([candidate], WATCHLIST, SeenStore(self.state), TODAY)
+
+    def test_no_date_and_no_published_is_unverifiable(self):
+        # amass の記事がこれ。記事 ID しか無い URL で、本文の「5月25日」が
+        # 何年か分からない。予定として扱うと終わったイベントが居座る。
+        items = self._run({
+            "title": "『銀河英雄伝説』一挙上映決定",
+            "url": "https://amass.jp/182382/",
+            "summary": "5月25日に上映",
+        })
+        self.assertTrue(items[0]["unverifiable"])
+
+    def test_url_date_makes_it_verifiable(self):
+        items = self._run({
+            "title": "銀河英雄伝説 リバイバル上映決定",
+            "url": "https://animeanime.jp/article/2026/09/10/1.html",
+            "summary": "10月3日より上映",
+        })
+        self.assertFalse(items[0]["unverifiable"])
+        self.assertEqual(items[0]["published"], "2026-09-10")
+        self.assertEqual(items[0]["event"]["start"], "2026-10-03")
+
+    def test_explicit_year_makes_it_verifiable(self):
+        items = self._run({
+            "title": "銀河英雄伝説 リバイバル上映決定",
+            "url": "https://amass.jp/999999/",
+            "summary": "2026年10月3日より上映",
+        })
+        self.assertFalse(items[0]["unverifiable"])

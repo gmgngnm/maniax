@@ -121,6 +121,8 @@ def to_writes(digest: dict) -> list[dict]:
                     "dateHint": item.get("date_hint", ""),
                     "dateConflict": item.get("date_conflict", []),
                     "sources": item.get("sources", []),
+                    "unverifiable": bool(item.get("unverifiable")),
+                    "firstSeen": item.get("first_seen", ""),
                 },
             }
         )

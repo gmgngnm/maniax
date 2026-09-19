@@ -206,6 +206,8 @@ def resolve(members: list[dict]) -> dict:
         "date_hint": primary.get("date_hint", ""),
         "date_confidence": primary.get("date_confidence", ""),
         "date_conflict": conflict,
+        # 束ねたどれか 1 つでも素性が分かれば、その催しは判定可能とみなす
+        "unverifiable": all(m.get("unverifiable") for m in members),
         "sources": [
             {"name": m.get("source", ""), "url": m.get("url", ""),
              "published": m.get("published", "")}

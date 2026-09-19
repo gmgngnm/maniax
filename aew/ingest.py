@@ -18,7 +18,8 @@ from datetime import date
 from pathlib import Path
 
 from . import digest
-from .dates import mentions_bare_date, parse_published, primary_range
+from .dates import (mentions_bare_date, parse_published,
+                    primary_range, published_from_path)
 from .match import evaluate
 from .store import SeenStore
 from .xposts import published_from_url
@@ -55,7 +56,9 @@ def run(candidates, watchlist, store: SeenStore, today: date) -> list[dict]:
         if from_snowflake:
             published = date.fromisoformat(from_snowflake)
         else:
-            published = parse_published(item.get("published", ""))
+            # 収集側の申告より、URL に埋まった日付の方が確実
+            published = (published_from_path(item.get("url", ""), today)
+                         or parse_published(item.get("published", "")))
         item["published"] = published.isoformat() if published else ""
 
         # 古い記事はニュースではない。候補ごと落とす。
@@ -101,10 +104,15 @@ def run(candidates, watchlist, store: SeenStore, today: date) -> list[dict]:
             continue
 
         event_date = (item["event"] or {}).get("start")
+        # 日付も公開日も分からないものは、過去か未来かを判定できない。
+        # 予定として扱うと、終わったイベントが居座り続ける。
+        item["unverifiable"] = not event_date and published is None
         item["status"] = store.status(item, event_date)
         if item["status"] != "known":
             results.append(item)
         store.remember(item, event_date, today)
+        # いつ初めて見た情報かは、素性の分からない項目の古さの目安になる
+        item["first_seen"] = store.entries[store.key(item)].get("first_seen", "")
 
     return results
 

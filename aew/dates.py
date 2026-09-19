@@ -254,3 +254,30 @@ def mentions_bare_date(text: str) -> str | None:
         if 1 <= month <= 12 and 1 <= day <= 31:
             return m.group(0).strip()
     return None
+
+
+# 記事 URL に埋まった公開日。animeanime.jp/article/2026/08/26/... のような形。
+# 前後を数字以外で区切り、記事 ID を日付と読み違えないようにする。
+_URL_DATE = re.compile(r"(?<!\d)(20\d{2})[/\-_]?(\d{2})[/\-_]?(\d{2})(?!\d)")
+
+
+def published_from_path(url: str, today: date | None = None) -> date | None:
+    """URL のパスから公開日を拾う。読めなければ None。
+
+    公開日は年の解釈にも古さの判定にも効くのに、収集側が拾い損ねることが
+    多い。URL に入っているなら、そこから取れる分は取る。
+    """
+    if not url:
+        return None
+    today = today or date.today()
+    path = re.sub(r"^https?://[^/]+", "", url)
+    for match in _URL_DATE.finditer(path):
+        year, month, day = (int(g) for g in match.groups())
+        try:
+            found = date(year, month, day)
+        except ValueError:
+            continue
+        # 未来の日付は公開日ではない。記事 ID の偶然の一致も落とす。
+        if date(2000, 1, 1) <= found <= today:
+            return found
+    return None
