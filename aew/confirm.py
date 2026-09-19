@@ -138,6 +138,15 @@ def main(argv=None) -> int:
     digest = json.loads(Path(args.digest).read_text(encoding="utf-8"))
     items = confirm_all(digest.get("items", []))
 
+    # 本文で日付を訂正したあとに、同じ催しをまとめる。順序が逆だと
+    # 訂正前の日付で食い違いを判定してしまう。
+    from .cluster import collapse
+
+    before = len(items)
+    items = collapse(items)
+    if before != len(items):
+        print(f"同じ催しをまとめた: {before} 件 -> {len(items)} 件")
+
     # 本文で日付が消えた・変わったものがあるので、通知文面を作り直す
     from . import digest as digest_mod
 

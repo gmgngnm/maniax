@@ -24,10 +24,10 @@ from .normalize import fingerprint
 
 # GUI 側に無い設定は既存の watchlist.json から引き継ぐ
 DEFAULT_SETTINGS = {
-    "categories": ["revival", "screening_event", "exhibition", "concert"],
+    "categories": ["revival", "screening_event", "exhibition", "concert", "goods"],
     "include_unmatched": False,
     "drop_past_events": True,
-    "max_queries": 80,
+    "max_queries": 100,
 }
 
 
@@ -119,6 +119,8 @@ def to_writes(digest: dict) -> list[dict]:
                     "published": item.get("published", ""),
                     "dateNote": item.get("date_note", ""),
                     "dateHint": item.get("date_hint", ""),
+                    "dateConflict": item.get("date_conflict", []),
+                    "sources": item.get("sources", []),
                 },
             }
         )

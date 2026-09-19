@@ -97,7 +97,7 @@ class TestQueryCoverage(unittest.TestCase):
 
     def _watchlist(self, n_works):
         return {
-            "settings": {"max_queries": 60},
+            "settings": {"max_queries": 100},
             "people": [{"name": "富野由悠季", "role": "監督"}],
             "works": [{"title": "作品" + str(i)} for i in range(n_works)],
         }
@@ -115,7 +115,7 @@ class TestQueryCoverage(unittest.TestCase):
         from aew.sources import queries_for
 
         watchlist = self._watchlist(100)
-        self.assertEqual(len(queries_for(watchlist)), 60)
+        self.assertEqual(len(queries_for(watchlist)), 100)
 
     def test_cap_spreads_across_templates(self):
         # 打ち切りが起きても、先頭のテンプレートだけで埋まらないこと
@@ -177,6 +177,7 @@ class TestPending(unittest.TestCase):
     def test_pending_entries_produce_only_their_own_queries(self):
         # 差分巡回は追加された作品だけを引く。劇場側の固定クエリは
         # 追加作品と無関係なので、毎時走らせない。
+        from aew.sources import WORK_QUERY_TEMPLATES as WORK_TEMPLATES
         from aew.sources import queries_for
         from aew.sync import from_db
 
@@ -185,7 +186,7 @@ class TestPending(unittest.TestCase):
         self.assertFalse(watchlist["settings"]["venue_queries"])
         queries = queries_for(watchlist)
         self.assertTrue(all("リーンの翼" in q for q in queries))
-        self.assertEqual(len(queries), 3)
+        self.assertEqual(len(queries), len(WORK_TEMPLATES))
 
     def test_full_run_includes_venue_queries(self):
         from aew.sources import VENUE_QUERIES, queries_for

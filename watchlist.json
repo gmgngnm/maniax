@@ -4,11 +4,12 @@
       "revival",
       "screening_event",
       "exhibition",
-      "concert"
+      "concert",
+      "goods"
     ],
     "include_unmatched": false,
     "drop_past_events": true,
-    "max_queries": 80,
+    "max_queries": 100,
     "region_note": "地域の絞り込みはしていない。全国の情報を拾ったうえで本文に劇場名が出る。",
     "venue_queries": true
   },

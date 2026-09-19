@@ -4,7 +4,7 @@ from aew.match import classify, evaluate, match_watchlist
 
 WATCHLIST = {
     "settings": {
-        "categories": ["revival", "screening_event", "exhibition", "concert"],
+        "categories": ["revival", "screening_event", "exhibition", "concert", "goods"],
         "include_unmatched": False,
     },
     "people": [{"name": "富野由悠季", "role": "監督", "aliases": ["富野喜幸", "井荻麟"]}],
@@ -25,8 +25,15 @@ class TestClassify(unittest.TestCase):
     def test_concert_detected(self):
         self.assertIn("concert", classify("オーケストラコンサート開催"))
 
-    def test_disc_release_is_not_an_event(self):
-        self.assertEqual(classify("Blu-ray BOX発売決定"), [])
+    def test_disc_release_is_goods(self):
+        # 以前は「イベントではない」として捨てていたが、グッズ欄を設けたので拾う
+        self.assertIn("goods", classify("Blu-ray BOX発売決定"))
+
+    def test_goods_dropped_when_category_disabled(self):
+        self.assertEqual(classify("Blu-ray BOX発売決定", enabled={"revival"}), [])
+
+    def test_streaming_is_still_not_an_event(self):
+        self.assertEqual(classify("アニメの配信開始"), [])
 
     def test_disabled_category_is_ignored(self):
         self.assertEqual(classify("原画展の開催", enabled={"revival"}), [])

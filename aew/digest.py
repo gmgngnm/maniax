@@ -11,6 +11,7 @@ CATEGORY_LABELS = {
     "screening_event": "上映イベント",
     "exhibition": "展示・コラボ",
     "concert": "ライブ・コンサート",
+    "goods": "グッズ・商品",
 }
 
 STATUS_LABELS = {"new": "NEW", "updated": "日程判明"}

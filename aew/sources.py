@@ -56,6 +56,7 @@ WORK_QUERY_TEMPLATES = [
     "{term} リバイバル上映",
     "{term} 上映 イベント 決定",
     "{term} 展示会 原画展 コンサート",
+    "{term} グッズ 発売 予約受付",
 ]
 
 # 作品を問わず広く拾う用。watchlist.settings.include_unmatched が真のときだけ使う。
