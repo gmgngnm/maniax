@@ -189,3 +189,50 @@ class TestUnverifiable(unittest.TestCase):
             "summary": "2026年10月3日より上映",
         })
         self.assertFalse(items[0]["unverifiable"])
+
+
+class TestSpanSanity(unittest.TestCase):
+    """会期の長さが種別に対してありえない範囲なら、日程として採らない。"""
+
+    def test_nine_month_screening_rejected(self):
+        # 実例: 福岡市美術館の「上映会」が 2026-06-30〜2027-03-31 として
+        # 登録された。上映会が 9 か月続くことはない。
+        verdict = assess(
+            date(2026, 6, 30), date(2026, 6, 20), TODAY, True,
+            end=date(2027, 3, 31), categories=["screening_event"],
+        )
+        self.assertFalse(verdict.accepted)
+        self.assertIn("長すぎる", verdict.reason)
+
+    def test_two_week_screening_accepted(self):
+        verdict = assess(
+            date(2026, 10, 1), date(2026, 9, 10), TODAY, True,
+            end=date(2026, 10, 14), categories=["screening_event"],
+        )
+        self.assertTrue(verdict.accepted)
+
+    def test_month_long_exhibition_accepted(self):
+        verdict = assess(
+            date(2026, 11, 6), date(2026, 9, 12), TODAY, True,
+            end=date(2026, 12, 6), categories=["exhibition"],
+        )
+        self.assertTrue(verdict.accepted)
+
+    def test_exhibition_gets_a_longer_allowance_than_screening(self):
+        span = (date(2026, 11, 6), date(2027, 3, 1))
+        self.assertTrue(assess(span[0], date(2026, 10, 1), TODAY, True,
+                               end=span[1], categories=["exhibition"]).accepted)
+        self.assertFalse(assess(span[0], date(2026, 10, 1), TODAY, True,
+                                end=span[1], categories=["revival"]).accepted)
+
+    def test_mixed_categories_take_the_longest_allowance(self):
+        verdict = assess(
+            date(2026, 11, 6), date(2026, 10, 1), TODAY, True,
+            end=date(2027, 3, 1), categories=["screening_event", "exhibition"],
+        )
+        self.assertTrue(verdict.accepted)
+
+    def test_single_day_always_fine(self):
+        verdict = assess(date(2026, 10, 1), date(2026, 9, 10), TODAY, True,
+                         categories=["concert"])
+        self.assertTrue(verdict.accepted)

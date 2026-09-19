@@ -85,6 +85,7 @@ def run(candidates, watchlist, store: SeenStore, today: date) -> list[dict]:
             today,
             bool(candidate_range and candidate_range.get("year_explicit")),
             end=end_date,
+            categories=item.get("categories"),
         )
         if verdict.accepted:
             item["event"] = candidate_range

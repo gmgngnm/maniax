@@ -30,6 +30,25 @@ MAX_LEAD_DAYS = 550
 # 記事公開より前の日付は、過去の出来事への言及とみなす。
 MAX_BACKDATE_DAYS = 31
 
+# 種別ごとの、ありうる会期の長さ（日）。これを超える範囲は日程ではなく、
+# 施設の年度表示やページの掲載期間を拾ってしまった疑いが強い。
+# 実例: 福岡市美術館の「上映会」が 2026-06-30〜2027-03-31（9か月）として
+# 登録された。上映会が 9 か月続くことはない。
+MAX_SPAN_DAYS = {
+    "revival": 60,
+    "screening_event": 60,
+    "concert": 31,
+    "goods": 31,
+    "exhibition": 210,
+}
+DEFAULT_MAX_SPAN_DAYS = 210
+
+
+def max_span_for(categories) -> int:
+    """その催しに許す会期の長さ。複数種別なら最も長いものに合わせる。"""
+    spans = [MAX_SPAN_DAYS[c] for c in (categories or []) if c in MAX_SPAN_DAYS]
+    return max(spans) if spans else DEFAULT_MAX_SPAN_DAYS
+
 
 class Verdict:
     """判定結果。日付を採るか、採らないか、その理由。"""
@@ -55,10 +74,21 @@ def is_stale(published: date | None, today: date,
 
 
 def assess(start: date | None, published: date | None, today: date,
-           year_was_explicit: bool, end: date | None = None) -> Verdict:
+           year_was_explicit: bool, end: date | None = None,
+           categories=None) -> Verdict:
     """この日付を予定として出してよいかを判定する。"""
     if start is None:
         return Verdict(False, "日付が読み取れない")
+
+    if end is not None:
+        span = (end - start).days + 1
+        limit = max_span_for(categories)
+        if span > limit:
+            return Verdict(
+                False,
+                f"会期が{span}日と長すぎる（この種別の上限{limit}日）。"
+                "掲載期間や年度表示を拾った疑い",
+            )
 
     if published is None:
         # 記事の公開日が分からないと、年が正しいか確かめようがない。

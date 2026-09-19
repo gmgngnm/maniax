@@ -121,3 +121,69 @@ class TestCollapse(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestMergeWithExisting(unittest.TestCase):
+    """別の日の巡回で同じ催しが 2 行目にならないか。
+
+    小田原の展覧会が、後日 X 経由で 2 行目として入ってしまった。
+    collapse は 1 回の巡回の中でしかまとめられないため。
+    """
+
+    EXISTING = {
+        "title": "小田原市出身アニメーション映画監督、富野由悠季さん 11月から原点辿る展覧会 小田原城天守閣と三の丸ホールに資料1万点",
+        "url": "https://www.townnews.co.jp/b", "source": "タウンニュース",
+        "published": "2026-09-12", "categories": ["exhibition"],
+        "matches": [{"label": "富野由悠季"}],
+        "start": "2026-11-06", "end": "2026-12-06",
+        "calendarEventId": "cal123",
+        "sources": [{"name": "タウンニュース", "url": "https://www.townnews.co.jp/b"}],
+    }
+    FRESH = {
+        "title": "富野由悠季監督の軌跡を辿る展示会「富野由悠季の原点－小田原から宇宙へ－」が小田原市にて11月に開催決定！キービジュアル公開！",
+        "url": "https://x.com/gundam_info/status/2092160065830527246",
+        "source": "X (@gundam_info)", "published": "2026-08-25",
+        "categories": ["exhibition"], "matches": [{"label": "富野由悠季"}],
+        "event": None, "date_note": "日付が読み取れない", "sources": [],
+    }
+
+    def _merge(self):
+        from aew.sync import _event_from_db, merge_existing
+        existing = [_event_from_db("doc_old", self.EXISTING)]
+        return merge_existing(existing, [self.FRESH], {"doc_old": 4})
+
+    def test_merges_into_the_existing_row(self):
+        writes = self._merge()
+        sets = [w for w in writes if w["op"] == "set"]
+        self.assertEqual(len(sets), 1)
+        self.assertEqual(sets[0]["doc_id"], "doc_old")
+        self.assertEqual(sets[0]["if_version"], 4)
+
+    def test_no_second_row_created(self):
+        self.assertEqual(len([w for w in self._merge() if w["op"] == "set"]), 1)
+
+    def test_confirmed_date_survives_the_merge(self):
+        data = [w for w in self._merge() if w["op"] == "set"][0]["data"]
+        self.assertEqual(data["start"], "2026-11-06")
+        self.assertEqual(data["end"], "2026-12-06")
+
+    def test_calendar_link_is_preserved(self):
+        data = [w for w in self._merge() if w["op"] == "set"][0]["data"]
+        self.assertEqual(data["calendarEventId"], "cal123")
+
+    def test_untouched_rows_are_not_rewritten(self):
+        from aew.sync import _event_from_db, merge_existing
+        other = _event_from_db("doc_other", {
+            "title": "無関係な催し", "url": "https://x/y",
+            "categories": ["concert"], "matches": [{"label": "別作品"}],
+        })
+        writes = merge_existing([other], [], {"doc_other": 1})
+        self.assertEqual(writes, [])
+
+    def test_brand_new_event_gets_a_fingerprint_id(self):
+        from aew.sync import merge_existing
+        writes = merge_existing([], [dict(self.FRESH)], {})
+        self.assertEqual(len(writes), 1)
+        self.assertEqual(writes[0]["op"], "set")
+        self.assertNotIn("if_version", writes[0])
+        self.assertRegex(writes[0]["doc_id"], r"^[0-9a-f]{16}$")

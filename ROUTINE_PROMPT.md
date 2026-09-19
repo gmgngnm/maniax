@@ -94,9 +94,18 @@ cd /home/user/maniax && python3 -m aew.confirm --digest /tmp/digest.json --out /
 ## 6. GUI に反映する
 
 ```bash
-cd /home/user/maniax && python3 -m aew.sync to-writes \
+cd /home/user/maniax && python3 -m aew.sync merge-existing \
+  --existing-dir /tmp/db/events --versions /tmp/versions.json \
   --digest /tmp/digest.json --out /tmp/writes.json
 ```
+
+`to-writes` ではなく **`merge-existing` を使う**。新着を既存の行とも突き合わせ、
+同じ催しなら 1 行に畳む。`to-writes` は 1 回の巡回の中でしかまとめられず、
+別の日に別の媒体が同じ催しを報じると 2 行目ができてしまう。
+
+`--versions` には `{"doc_id": version, ...}` の JSON を渡す。`read_db` の
+`list` 出力に各行の version が出ているので、そこから作る。既存の行を
+書き換えるには `if_version` が要り、無いと batch 全体が失敗する。
 
 `/tmp/writes.json` の中身を Artifact ツールの `write_db`（`db_op: "batch"`）で
 上記 URL に書き込む。`doc_id` は収集側の重複判定と同じ値なので、
