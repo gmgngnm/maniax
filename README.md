@@ -166,7 +166,31 @@ snowflake なので、**ID から投稿日時を厳密に復元できる**（`ae
 クラウド側の制限は手元の PC には無い。**検索だけを手元でやり、結果を
 リポジトリ経由で渡す**と、ポリシーを回避せずに速報性が手に入る。
 
-##### 手順
+##### 手順（Windows）
+
+PowerShell を開いて実行する（コマンドプロンプトではなく PowerShell）。
+`gh auth login` だけはコマンドプロンプトでも動く。
+
+```powershell
+winget install GitHub.cli        # gh が無ければ
+winget install Git.Git           # git が無ければ
+gh auth login                    # ブラウザでログイン
+
+gh repo clone gmgngnm/maniax
+cd maniax
+
+powershell -ExecutionPolicy Bypass -File bin\check-local.ps1    # 診断
+powershell -ExecutionPolicy Bypass -File bin\maniax-local.ps1   # 手で一度
+Get-Content .local-run.log -Tail 20
+
+powershell -ExecutionPolicy Bypass -File bin\install-local.ps1  # 3時間ごとに登録
+powershell -ExecutionPolicy Bypass -File bin\install-local.ps1 -Remove
+```
+
+Python は [python.org](https://www.python.org/downloads/) から入れる。
+導入時に **Add python.exe to PATH** に必ずチェックを入れること。
+
+##### 手順（macOS / Linux）
 
 1. **GitHub の認証を通す**（private リポジトリなので必要）
 
@@ -209,8 +233,7 @@ snowflake なので、**ID から投稿日時を厳密に復元できる**（`ae
 
 以降は自動。PC の電源が入っていれば勝手に動く。
 
-macOS は launchd、Linux は cron に登録する。Windows は
-`bin/maniax-local.ps1` の冒頭にタスク登録のコマンドがある。
+macOS は launchd、Linux は cron、Windows はタスクスケジューラに登録する。
 
 やっていることは `bin/maniax-local.sh` のとおりで、pull → `aew.collect_x`
 で X を検索 → `inbox/` に書き出し → commit → push。次の巡回が
