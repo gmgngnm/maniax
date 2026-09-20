@@ -161,6 +161,33 @@ Routine（定期トリガー）が毎回まっさらなクラウドセッショ�
 snowflake なので、**ID から投稿日時を厳密に復元できる**（`aew/xposts.py`）。
 古い投稿を新しい予定と誤認する事故は、これで構造的に防げている。
 
+#### 手元の PC で集めて渡す（許可を待たずに済む唯一の方法）
+
+クラウド側の制限は手元の PC には無い。**検索だけを手元でやり、結果を
+リポジトリ経由で渡す**と、ポリシーを回避せずに速報性が手に入る。
+
+```bash
+git clone https://github.com/gmgngnm/maniax && cd maniax
+bash bin/install-local.sh        # 3 時間ごとに自動実行（macOS / Linux）
+bash bin/install-local.sh 1      # 1 時間ごと
+bash bin/install-local.sh --remove
+```
+
+macOS は launchd、Linux は cron に登録する。Windows は
+`bin/maniax-local.ps1` の冒頭にタスク登録のコマンドがある。
+
+やっていることは `bin/maniax-local.sh` のとおりで、pull → `aew.collect_x`
+で X を検索 → `inbox/` に書き出し → commit → push。次の巡回が
+`aew.inbox` でそれを読み、通常の検索結果と一緒に突き合わせる。
+取り込まれたファイルは巡回側が消す。
+
+手元で動くのは検索と push だけ。判定・重複排除・通知はすべて
+クラウド側の巡回が従来どおり行う。
+
+**ログインした状態で X を機械的に読むことはしない。** 規約違反であり、
+アカウントが凍結される。使うのは公開 API と、X を索引している
+第三者の検索のみ。
+
 #### 本物のキーワード検索を通すには
 
 `aew/xsearch.py` に 3 つの経路を実装済み。**いずれも egress ポリシーで

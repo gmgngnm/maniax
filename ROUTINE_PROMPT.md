@@ -69,6 +69,18 @@ cd /home/user/maniax && python3 -m aew.sources --watchlist /tmp/watchlist.json -
 **`published` は空でよい。** status URL の ID から投稿日時が厳密に復元される。
 推測で埋めると、確実な値を上書きしてしまう。
 
+## 手元の PC から渡された候補を取り込む
+
+```bash
+cd /home/user/maniax && python3 -m aew.inbox \
+  --dir inbox --merge-into /tmp/candidates.json --out /tmp/candidates.json --consume
+```
+
+クラウド側からは X に到達できないため、利用者が手元の PC で集めた投稿が
+`inbox/` に置かれていることがある。通常の検索結果と結合して同じ扱いにする。
+`--consume` で取り込んだファイルは消えるので、手順の最後のコミットに
+その削除も含めること。
+
 ## 5. 突き合わせる
 
 ```bash
