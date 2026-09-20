@@ -26,6 +26,16 @@ def run(check_youtube: bool = True) -> int:
             reachable += ok
             print(f"  {'OK  ' if ok else 'NG  '}{entry['name']:<22}{'' if ok else why[:58]}")
 
+    print("\n== X のキーワード検索 ==")
+    from .xsearch import available as x_available
+    for name, (ok, why) in x_available().items():
+        total += 1
+        reachable += ok
+        label = {"api": "X API v2（要トークン）",
+                 "realtime": "Yahoo!リアルタイム検索",
+                 "profile": "公式アカウント購読"}[name]
+        print(f"  {'OK  ' if ok else 'NG  '}{label:<26}{'' if ok else why[:44]}")
+
     if check_youtube:
         print("\n== YouTube 公式チャンネル ==")
         for entry in YOUTUBE_HANDLES:

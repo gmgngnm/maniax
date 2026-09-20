@@ -38,9 +38,11 @@ def _context() -> ssl.SSLContext:
     return ssl.create_default_context()
 
 
-def fetch_bytes(url: str, timeout: int = TIMEOUT) -> bytes:
+def fetch_bytes(url: str, timeout: int = TIMEOUT, headers: dict | None = None) -> bytes:
     """URL を取得する。失敗は FetchError。"""
-    request = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
+    all_headers = {"User-Agent": USER_AGENT}
+    all_headers.update(headers or {})
+    request = urllib.request.Request(url, headers=all_headers)
     try:
         with urllib.request.urlopen(request, timeout=timeout, context=_context()) as r:
             return r.read(MAX_BYTES)
