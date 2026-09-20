@@ -166,12 +166,48 @@ snowflake なので、**ID から投稿日時を厳密に復元できる**（`ae
 クラウド側の制限は手元の PC には無い。**検索だけを手元でやり、結果を
 リポジトリ経由で渡す**と、ポリシーを回避せずに速報性が手に入る。
 
-```bash
-git clone https://github.com/gmgngnm/maniax && cd maniax
-bash bin/install-local.sh        # 3 時間ごとに自動実行（macOS / Linux）
-bash bin/install-local.sh 1      # 1 時間ごと
-bash bin/install-local.sh --remove
-```
+##### 手順
+
+1. **GitHub の認証を通す**（private リポジトリなので必要）
+
+   ```bash
+   gh auth login
+   ```
+
+   GitHub CLI が無ければ先に入れる。macOS は `brew install gh`、
+   Ubuntu は `sudo apt install gh`。
+
+2. **リポジトリを取ってくる**
+
+   ```bash
+   gh repo clone gmgngnm/maniax && cd maniax
+   ```
+
+3. **準備ができているか確かめる**
+
+   ```bash
+   bash bin/check-local.sh
+   ```
+
+   足りないものがあれば、何をすればよいか表示される。
+
+4. **一度手で動かしてみる**
+
+   ```bash
+   bash bin/maniax-local.sh && tail -20 .local-run.log
+   ```
+
+   `push 完了` と出れば通っている。
+
+5. **定期実行に登録する**
+
+   ```bash
+   bash bin/install-local.sh        # 3 時間ごと
+   bash bin/install-local.sh 1      # 1 時間ごと
+   bash bin/install-local.sh --remove   # 解除
+   ```
+
+以降は自動。PC の電源が入っていれば勝手に動く。
 
 macOS は launchd、Linux は cron に登録する。Windows は
 `bin/maniax-local.ps1` の冒頭にタスク登録のコマンドがある。
