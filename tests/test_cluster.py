@@ -7,8 +7,8 @@
 
 import unittest
 
-from aew.cluster import (collapse, distinctive_terms, related,
-                         same_event, title_similarity)
+from aew.cluster import (collapse, distinctive_terms, group, related,
+                         same_event, signal_text, title_similarity)
 
 ODAWARA_A = {
     "title": "富野由悠季の原点に迫る！「機動戦士ガンダム」富野監督の展覧会が小田原城などで11月開催",
@@ -187,3 +187,52 @@ class TestMergeWithExisting(unittest.TestCase):
         self.assertEqual(writes[0]["op"], "set")
         self.assertNotIn("if_version", writes[0])
         self.assertRegex(writes[0]["doc_id"], r"^[0-9a-f]{16}$")
+
+
+def _x_post(name, handle, summary, labels, categories):
+    return {
+        "title": f"{name} (@{handle})",
+        "summary": summary,
+        "url": f"https://x.com/{handle}/status/1",
+        "source": name,
+        "published": "",
+        "matches": [{"label": label} for label in labels],
+        "categories": categories,
+    }
+
+
+ODAWARA_POST = _x_post(
+    "ガンダム公式", "gundam_info",
+    "富野由悠季監督の展示会「富野由悠季の原点－小田原から宇宙へ－」が"
+    "小田原市にて11月開催決定し、キービジュアルが公開された。",
+    ["富野由悠季"], ["exhibition"],
+)
+
+
+class TestHandleTitles(unittest.TestCase):
+    """X の投稿は見出しがアカウント名で、催しの手がかりが要約にしかない。
+
+    小田原の展覧会が X 経由で 2 行目になった。見出しだけを見ていると
+    登録済みの行と結び付かない。
+    """
+
+    def test_要約まで見て登録済みの催しに束ねる(self):
+        self.assertTrue(same_event(ODAWARA_B, ODAWARA_POST))
+        self.assertEqual(1, len(group([ODAWARA_B, ODAWARA_POST])))
+
+    def test_見出しに手がかりのある記事は要約を足さない(self):
+        # 要約まで見ると語が増えすぎ、別の催しまで束ねてしまう。
+        item = {
+            "title": "『銀河英雄伝説』POP UP SHOP in コトブキヤ",
+            "summary": "あわせてねんどろいどの再販も決定した。",
+        }
+        self.assertEqual(item["title"], signal_text(item))
+
+    def test_同じ人物を扱う別の催しの投稿は束ねない(self):
+        other = _x_post(
+            "サンライズ", "sunrise_inc",
+            "富野由悠季監督作品『リーンの翼』のアニメ化20周年記念上映会が"
+            "新宿ピカデリーで決定しました。",
+            ["富野由悠季"], ["screening_event"],
+        )
+        self.assertFalse(same_event(ODAWARA_POST, other))

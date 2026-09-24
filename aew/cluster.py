@@ -67,6 +67,27 @@ def distinctive_terms(title: str, exclude: set[str] | None = None) -> set[str]:
     return found
 
 
+# X の投稿は見出しがアカウント名（「ガンダム公式 (@gundam_info)」）になり、
+# 催しを指す語が要約にしか入らない。見出しだけを見ていると、既に登録済みの
+# 催しと結び付かず、同じ催しの 2 行目・3 行目ができてしまう。実際、小田原の
+# 展覧会が X 経由で 2 行に増えた。
+_HANDLE_TITLE = re.compile(r"[（(]@[A-Za-z0-9_]{1,15}[）)]\s*$")
+
+
+def signal_text(item: dict) -> str:
+    """その催しを見分けるのに使う文字列。
+
+    見出しに手がかりがない投稿だけ、要約も足す。常に足すと語が増えすぎて、
+    別の催しまで束ねてしまう（グッズの再販と POP UP SHOP を取り違えた）。
+    """
+    title = (item.get("title") or "").strip()
+    if _HANDLE_TITLE.search(title):
+        summary = (item.get("summary") or "").strip()
+        if summary:
+            return title + " " + summary
+    return title
+
+
 def related(a: str, b: str) -> bool:
     """2 つの語が同じものを指していそうか。
 
@@ -108,11 +129,12 @@ def same_event(a: dict, b: dict) -> bool:
     if not shared_labels:
         return False
 
-    if title_similarity(a.get("title", ""), b.get("title", "")) >= TITLE_SIMILARITY_STRONG:
+    text_a, text_b = signal_text(a), signal_text(b)
+    if title_similarity(text_a, text_b) >= TITLE_SIMILARITY_STRONG:
         return True
 
-    terms_a = distinctive_terms(a.get("title", ""), shared_labels)
-    terms_b = distinctive_terms(b.get("title", ""), shared_labels)
+    terms_a = distinctive_terms(text_a, shared_labels)
+    terms_b = distinctive_terms(text_b, shared_labels)
     shared = shared_term_count(terms_a, terms_b)
     if shared >= SHARED_TERMS_REQUIRED:
         return True
