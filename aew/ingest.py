@@ -18,7 +18,7 @@ from datetime import date
 from pathlib import Path
 
 from . import digest
-from .dates import (mentions_bare_date, parse_published,
+from .dates import (mentions_bare_date, mentions_month, parse_published,
                     primary_range, published_from_path)
 from .match import evaluate
 from .store import SeenStore
@@ -100,6 +100,13 @@ def run(candidates, watchlist, store: SeenStore, today: date) -> list[dict]:
                 if candidate_range is None:
                     # 日付は書いてあるが年が無く、基準にする公開日も無い
                     item["date_note"] = "出典に年の記載がなく、記事の公開日も不明"
+            elif not candidate_range:
+                # 「2026年9月から発売」のように月までしか無い告知。
+                # 日が無いので予定には出せないが、時期は伝えられる。
+                month = mentions_month(text, published)
+                if month:
+                    item["date_hint"] = month
+                    item["date_note"] = "出典に月までしか書かれていない（日は未発表）"
 
         if drop_past and _has_ended(item["event"], today):
             continue

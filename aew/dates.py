@@ -256,6 +256,35 @@ def mentions_bare_date(text: str) -> str | None:
     return None
 
 
+# 「2026年9月から発売」のように、月までしか書かれていない告知。
+# 日が無いのでカレンダーには入れられないが、「日付が読み取れない」と
+# 突き放すより「2026年9月」と伝えた方が、利用者が自分で追える。
+_MONTH_ONLY = re.compile(
+    r"(?:(?P<y>20\d{2})\s*年\s*)?(?P<m>\d{1,2})\s*月"
+    r"(?!\s*\d{1,2}\s*日)"      # 「9月18日」は日付として別で拾う
+    r"(?!\s*[/／.]\s*\d)"        # 「9/18」も同様
+)
+
+
+def mentions_month(text: str, ref: date | None = None) -> str | None:
+    """月までしか書かれていない時期があれば、読みやすい形で返す。
+
+    年が書かれていなければ記事の公開日から補うが、これは**表示用の
+    手がかりに限る**。カレンダーにも予定一覧にも日付としては渡さない。
+    """
+    if not text:
+        return None
+    for m in _MONTH_ONLY.finditer(unicodedata.normalize("NFKC", text)):
+        month = int(m.group("m"))
+        if not 1 <= month <= 12:
+            continue
+        if m.group("y"):
+            return f"{int(m.group('y'))}年{month}月"
+        year = _infer_year(month, 1, ref)
+        return f"{year}年{month}月" if year else f"{month}月"
+    return None
+
+
 # 記事 URL に埋まった公開日。animeanime.jp/article/2026/08/26/... のような形。
 # 前後を数字以外で区切り、記事 ID を日付と読み違えないようにする。
 _URL_DATE = re.compile(r"(?<!\d)(20\d{2})[/\-_]?(\d{2})[/\-_]?(\d{2})(?!\d)")

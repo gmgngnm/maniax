@@ -1,7 +1,8 @@
 import unittest
 from datetime import date
 
-from aew.dates import extract_ranges, primary_range, published_from_path
+from aew.dates import (extract_ranges, mentions_month, primary_range,
+                       published_from_path)
 
 REF = date(2026, 9, 10)
 
@@ -117,3 +118,30 @@ class TestPublishedFromPath(unittest.TestCase):
 
     def test_host_digits_ignored(self):
         self.assertIsNone(published_from_path("https://20260101.example.com/x", self.TODAY))
+
+
+class TestMentionsMonth(unittest.TestCase):
+    """月までしか書かれていない告知。日が無いので予定には出せないが、
+    「日付が読み取れない」と突き放すより時期を伝えた方が追える。"""
+
+    def test_年月が書かれていればそのまま返す(self):
+        self.assertEqual(
+            "2026年9月",
+            mentions_month("名作アニメのロゴを立体化！2026年9月から発売",
+                           date(2026, 8, 25)),
+        )
+
+    def test_年が無ければ公開日から補う(self):
+        self.assertEqual("2025年5月",
+                         mentions_month("5月に開催予定", date(2025, 9, 1)))
+
+    def test_基準が無ければ年を付けない(self):
+        self.assertEqual("5月", mentions_month("5月に開催予定", None))
+
+    def test_日まで書かれていれば拾わない(self):
+        # 日付として別で拾うので、こちらで二重に出さない
+        self.assertIsNone(mentions_month("9月18日(金)より公開", date(2026, 8, 25)))
+        self.assertIsNone(mentions_month("9/18公開", date(2026, 8, 25)))
+
+    def test_時期の記述が無ければNone(self):
+        self.assertIsNone(mentions_month("新作ゲーム情報", date(2026, 8, 25)))
