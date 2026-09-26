@@ -182,6 +182,30 @@ def _trust(item: dict) -> tuple:
     )
 
 
+def _sources(ranked: list[dict]) -> list[dict]:
+    """束ねた全員の出典を、信用できる順に並べて重複を除く。
+
+    既に束ねてある行を DB から読み直したときは、その行が抱えている出典を
+    そのまま引き継ぐ。ここで作り直すと、巡回のたびに出典が 1 本に減って
+    いく（小田原の展覧会で、手で足した X の出典が消えた）。
+    """
+    out: list[dict] = []
+    seen: set[str] = set()
+    for member in ranked:
+        known = member.get("sources") or [{
+            "name": member.get("source", ""),
+            "url": member.get("url", ""),
+            "published": member.get("published", ""),
+        }]
+        for entry in known:
+            url = entry.get("url", "")
+            if url in seen:
+                continue
+            seen.add(url)
+            out.append(entry)
+    return out
+
+
 def resolve(members: list[dict]) -> dict:
     """1 つの催しとしての代表値を組み立てる。
 
@@ -230,11 +254,7 @@ def resolve(members: list[dict]) -> dict:
         "date_conflict": conflict,
         # 束ねたどれか 1 つでも素性が分かれば、その催しは判定可能とみなす
         "unverifiable": all(m.get("unverifiable") for m in members),
-        "sources": [
-            {"name": m.get("source", ""), "url": m.get("url", ""),
-             "published": m.get("published", "")}
-            for m in ranked
-        ],
+        "sources": _sources(ranked),
         "status": min((m.get("status", "known") for m in members),
                       key=lambda s: {"new": 0, "updated": 1, "known": 2}.get(s, 3)),
     }

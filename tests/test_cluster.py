@@ -236,3 +236,64 @@ class TestHandleTitles(unittest.TestCase):
             ["富野由悠季"], ["screening_event"],
         )
         self.assertFalse(same_event(ODAWARA_POST, other))
+
+
+class TestSourcesSurviveRoundTrip(unittest.TestCase):
+    """DB に入れた行を読み直して束ね直すと、出典が 1 本に減っていた。
+
+    小田原の展覧会で、手で足した X の出典が巡回のたびに消えた。
+    """
+
+    def test_既存行が抱えている出典を引き継ぐ(self):
+        stored = {
+            "_doc_id": "abc", "title": "富野由悠季の原点－小田原から宇宙へ－",
+            "url": "https://tomino-beginningpoint.jp/", "source": "公式サイト",
+            "published": "2026-09-12", "matches": [{"label": "富野由悠季"}],
+            "categories": ["exhibition"],
+            "event": {"start": "2026-11-06", "end": "2026-12-06"},
+            "sources": [
+                {"name": "公式サイト", "url": "https://tomino-beginningpoint.jp/",
+                 "published": "2026-09-12"},
+                {"name": "ガンダム公式", "url": "https://x.com/gundam_info/status/1",
+                 "published": "2026-08-25"},
+            ],
+        }
+        merged = collapse([stored])[0]
+        self.assertEqual(
+            ["https://tomino-beginningpoint.jp/", "https://x.com/gundam_info/status/1"],
+            [s["url"] for s in merged["sources"]],
+        )
+
+    def test_新着と束ねても既存の出典を落とさない(self):
+        stored = {
+            "_doc_id": "abc", "title": "富野由悠季の原点－小田原から宇宙へ－",
+            "url": "https://tomino-beginningpoint.jp/", "source": "公式サイト",
+            "published": "2026-09-12", "matches": [{"label": "富野由悠季"}],
+            "categories": ["exhibition"],
+            "event": {"start": "2026-11-06", "end": "2026-12-06"},
+            "sources": [
+                {"name": "公式サイト", "url": "https://tomino-beginningpoint.jp/",
+                 "published": "2026-09-12"},
+                {"name": "ガンダム公式", "url": "https://x.com/gundam_info/status/1",
+                 "published": "2026-08-25"},
+            ],
+        }
+        fresh = {
+            "title": "小田原から宇宙へ、富野由悠季の原点をたどる展覧会が開幕",
+            "url": "https://natalie.mu/comic/news/999999", "source": "コミックナタリー",
+            "published": "2026-09-20", "matches": [{"label": "富野由悠季"}],
+            "categories": ["exhibition"],
+            "event": {"start": "2026-11-06", "end": "2026-12-06"},
+        }
+        merged = collapse([stored, fresh])
+        self.assertEqual(1, len(merged))
+        urls = [s["url"] for s in merged[0]["sources"]]
+        self.assertIn("https://x.com/gundam_info/status/1", urls)
+        self.assertIn("https://natalie.mu/comic/news/999999", urls)
+
+    def test_同じurlを二度並べない(self):
+        a = {"title": "展", "url": "https://a/", "source": "A", "published": "",
+             "matches": [{"label": "X"}], "categories": ["exhibition"],
+             "sources": [{"name": "A", "url": "https://a/", "published": ""}]}
+        merged = collapse([a])[0]
+        self.assertEqual(1, len(merged["sources"]))
