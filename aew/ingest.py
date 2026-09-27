@@ -69,6 +69,8 @@ def run(candidates, watchlist, store: SeenStore, today: date) -> list[dict]:
             filter(None, [item["title"], item.get("snippet", ""), item.get("summary", "")])
         )
         candidate_range = primary_range(text, published)
+        # 「2026年9月」のように年月だけ書かれていたか
+        month_year_explicit = False
 
         # 読み取れた日付を、出してよいかどうか門番に通す
         start_date = (
@@ -103,9 +105,9 @@ def run(candidates, watchlist, store: SeenStore, today: date) -> list[dict]:
             elif not candidate_range:
                 # 「2026年9月から発売」のように月までしか無い告知。
                 # 日が無いので予定には出せないが、時期は伝えられる。
-                month = mentions_month(text, published)
-                if month:
-                    item["date_hint"] = month
+                found = mentions_month(text, published)
+                if found:
+                    item["date_hint"], month_year_explicit = found
                     item["date_note"] = "出典に月までしか書かれていない（日は未発表）"
 
         if drop_past and _has_ended(item["event"], today):
@@ -114,7 +116,11 @@ def run(candidates, watchlist, store: SeenStore, today: date) -> list[dict]:
         event_date = (item["event"] or {}).get("start")
         # 日付も公開日も分からないものは、過去か未来かを判定できない。
         # 予定として扱うと、終わったイベントが居座り続ける。
-        item["unverifiable"] = not event_date and published is None
+        # ただし出典が「2026年9月発売」と年月を書いているなら、日が無いだけで
+        # 時期は分かっている。「過去かもしれない」と断る必要はない。
+        item["unverifiable"] = (
+            not event_date and published is None and not month_year_explicit
+        )
         item["status"] = store.status(item, event_date)
         if item["status"] != "known":
             results.append(item)

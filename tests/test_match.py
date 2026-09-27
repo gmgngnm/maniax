@@ -1,6 +1,6 @@
 import unittest
 
-from aew.match import classify, evaluate, match_watchlist
+from aew.match import classify, evaluate, is_listing_url, match_watchlist
 
 WATCHLIST = {
     "settings": {
@@ -108,3 +108,44 @@ class TestExhibitionSuffix(unittest.TestCase):
     def test_bare_ten_does_not_false_positive(self):
         # 「展開」「発展」で誤爆しないこと
         self.assertEqual(classify("シリーズの新展開が発表、事業も発展"), [])
+
+
+class TestListingUrls(unittest.TestCase):
+    """検索結果・一覧ページは中身が入れ替わる。そこから拾った日付は
+    次に見たときには別の商品の日付になっているので、候補にしない。
+    アニメイトの animetitle/?aid=... が 1 件の催しとして並んだ。"""
+
+    LISTING = [
+        "https://www.animate-onlineshop.jp/animetitle/?aid=1156",
+        "https://example.com/search?keyword=%E9%8A%80%E8%8B%B1",
+        "https://example.com/tag/gengaten/",
+        "https://example.com/category/allnight/",
+    ]
+    DETAIL = [
+        "https://www.ticketpay.jp/booking/?event_id=57316",
+        "https://art.parco.jp/parcomuseum/detail/?id=179",
+        "https://natalie.mu/comic/news/649095",
+        "https://ccnews.cinemacity.co.jp/aa_38th_yojouhan/",
+        "https://gineiden-anime.com/goods/5986",
+    ]
+
+    def test_一覧ページと判定する(self):
+        for url in self.LISTING:
+            with self.subTest(url=url):
+                self.assertTrue(is_listing_url(url))
+
+    def test_個別ページは通す(self):
+        for url in self.DETAIL:
+            with self.subTest(url=url):
+                self.assertFalse(is_listing_url(url))
+
+    def test_一覧ページは候補にしない(self):
+        watchlist = {"works": [{"title": "銀河英雄伝説"}], "people": [],
+                     "settings": {}}
+        candidate = {
+            "title": "アニメイト「銀河英雄伝説」検索結果・9月下旬発売グッズ",
+            "url": "https://www.animate-onlineshop.jp/animetitle/?aid=1156",
+            "summary": "2026年9月下旬発売予定の新グッズが予約受付中。",
+            "source": "アニメイト", "published": "",
+        }
+        self.assertIsNone(evaluate(candidate, watchlist))

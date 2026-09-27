@@ -124,19 +124,19 @@ class TestMentionsMonth(unittest.TestCase):
     """月までしか書かれていない告知。日が無いので予定には出せないが、
     「日付が読み取れない」と突き放すより時期を伝えた方が追える。"""
 
-    def test_年月が書かれていればそのまま返す(self):
+    def test_年月が書かれていればそのまま返し年は出典由来と伝える(self):
         self.assertEqual(
-            "2026年9月",
+            ("2026年9月", True),
             mentions_month("名作アニメのロゴを立体化！2026年9月から発売",
                            date(2026, 8, 25)),
         )
 
-    def test_年が無ければ公開日から補う(self):
-        self.assertEqual("2025年5月",
+    def test_年が無ければ公開日から補い出典由来ではないと伝える(self):
+        self.assertEqual(("2025年5月", False),
                          mentions_month("5月に開催予定", date(2025, 9, 1)))
 
     def test_基準が無ければ年を付けない(self):
-        self.assertEqual("5月", mentions_month("5月に開催予定", None))
+        self.assertEqual(("5月", False), mentions_month("5月に開催予定", None))
 
     def test_日まで書かれていれば拾わない(self):
         # 日付として別で拾うので、こちらで二重に出さない

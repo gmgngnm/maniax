@@ -266,11 +266,16 @@ _MONTH_ONLY = re.compile(
 )
 
 
-def mentions_month(text: str, ref: date | None = None) -> str | None:
-    """月までしか書かれていない時期があれば、読みやすい形で返す。
+def mentions_month(text: str, ref: date | None = None
+                   ) -> tuple[str, bool] | None:
+    """月までしか書かれていない時期があれば (表示用の文字列, 年が出典にあったか)。
 
     年が書かれていなければ記事の公開日から補うが、これは**表示用の
     手がかりに限る**。カレンダーにも予定一覧にも日付としては渡さない。
+
+    年が出典に書かれていたかを返すのは、「いつ頃の話かも分からない」のと
+    「日だけ未発表」を区別するため。前者は過去かもしれないと断らねばならず、
+    後者は断る必要がない。
     """
     if not text:
         return None
@@ -279,9 +284,9 @@ def mentions_month(text: str, ref: date | None = None) -> str | None:
         if not 1 <= month <= 12:
             continue
         if m.group("y"):
-            return f"{int(m.group('y'))}年{month}月"
+            return f"{int(m.group('y'))}年{month}月", True
         year = _infer_year(month, 1, ref)
-        return f"{year}年{month}月" if year else f"{month}月"
+        return (f"{year}年{month}月" if year else f"{month}月"), False
     return None
 
 

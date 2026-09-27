@@ -4,6 +4,8 @@
 見逃し防止という当初の目的が達成できないため。
 """
 
+import re
+
 from .normalize import normalize, normalize_loose, strip_site_suffix
 
 # イベント種別。watchlist.json の categories でオン/オフする。
@@ -107,11 +109,29 @@ def match_watchlist(text: str, watchlist: dict) -> list[dict]:
     return matched
 
 
+# 検索結果や一覧のページ。中身が入れ替わるので、そこから拾った日付は
+# 次に見たときには別の商品の日付になっている。実際、アニメイトの
+# animetitle/?aid=... という検索結果ページが 1 件の催しとして並んだ。
+_LISTING_URL = re.compile(
+    r"/(?:search|tag|category|genre|ranking|animetitle|brandtitle)(?:/|\?|$)"
+    r"|[?&](?:keyword|query|searchWord)=",
+    re.IGNORECASE,
+)
+
+
+def is_listing_url(url: str) -> bool:
+    """検索結果・一覧ページか。個別の告知ページなら False。"""
+    return bool(url) and bool(_LISTING_URL.search(url))
+
+
 def evaluate(candidate: dict, watchlist: dict) -> dict | None:
     """候補1件を評価する。通知に値しなければ None。
 
     candidate: {"title", "url", "summary", "source", "published"}
     """
+    if is_listing_url(candidate.get("url", "")):
+        return None
+
     settings = watchlist.get("settings", {})
     enabled = set(settings.get("categories", CATEGORY_KEYWORDS.keys()))
 
