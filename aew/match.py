@@ -113,7 +113,8 @@ def match_watchlist(text: str, watchlist: dict) -> list[dict]:
 # 次に見たときには別の商品の日付になっている。実際、アニメイトの
 # animetitle/?aid=... という検索結果ページが 1 件の催しとして並んだ。
 _LISTING_URL = re.compile(
-    r"/(?:search|tag|category|genre|ranking|animetitle|brandtitle)(?:/|\?|$)"
+    r"/(?:search|tag|category|genre|ranking|animetitle|brandtitle"
+    r"|ballot_boxes)(?:/|\?|$)"
     r"|[?&](?:keyword|query|searchWord)=",
     re.IGNORECASE,
 )

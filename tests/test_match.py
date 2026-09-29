@@ -120,6 +120,8 @@ class TestListingUrls(unittest.TestCase):
         "https://example.com/search?keyword=%E9%8A%80%E8%8B%B1",
         "https://example.com/tag/gengaten/",
         "https://example.com/category/allnight/",
+        # ドリパスの投票ページ。日程はまだ決まっていない（e774 は個別公演）
+        "https://www.dreampass.jp/ballot_boxes/9",
     ]
     DETAIL = [
         "https://www.ticketpay.jp/booking/?event_id=57316",
@@ -127,6 +129,7 @@ class TestListingUrls(unittest.TestCase):
         "https://natalie.mu/comic/news/649095",
         "https://ccnews.cinemacity.co.jp/aa_38th_yojouhan/",
         "https://gineiden-anime.com/goods/5986",
+        "https://www.dreampass.jp/e774",
     ]
 
     def test_一覧ページと判定する(self):
