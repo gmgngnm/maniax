@@ -297,3 +297,54 @@ class TestSourcesSurviveRoundTrip(unittest.TestCase):
              "sources": [{"name": "A", "url": "https://a/", "published": ""}]}
         merged = collapse([a])[0]
         self.assertEqual(1, len(merged["sources"]))
+
+
+class TestMonthHintBridgesToSpan(unittest.TestCase):
+    """「11月開催決定」としか書かない投稿を、会期の分かっている行に束ねる。
+
+    小田原の展覧会が X 経由で 2 度 2 行目になった。1 度目は見出しが
+    アカウント名だったため、2 度目は会期を持たないためで、どちらも
+    固有名詞が「小田原」1 つしか重ならなかった。
+    """
+
+    DATED = {
+        "_doc_id": "abc", "title": "富野由悠季の原点－小田原から宇宙へ－",
+        "url": "https://tomino-beginningpoint.jp/", "source": "公式サイト",
+        "published": "2026-09-12", "matches": [{"label": "富野由悠季"}],
+        "categories": ["exhibition", "screening_event"],
+        "event": {"start": "2026-11-06", "end": "2026-12-06"},
+    }
+    POST = {
+        "title": "が小田原市にて11月に開催決定！キービジュアル公開！",
+        "url": "https://x.com/gundam_info/status/1", "source": "X",
+        "published": "2026-08-25", "matches": [{"label": "富野由悠季"}],
+        "categories": ["exhibition", "screening_event"],
+        "date_hint": "2026年11月",
+    }
+
+    def test_会期の月に収まる手がかりなら束ねる(self):
+        self.assertTrue(same_event(self.DATED, self.POST))
+        self.assertEqual(1, len(group([self.DATED, self.POST])))
+
+    def test_会期の外の月なら束ねない(self):
+        other = dict(self.POST, date_hint="2026年3月")
+        self.assertFalse(same_event(self.DATED, other))
+
+    def test_手がかりが無ければ束ねない(self):
+        other = dict(self.POST)
+        other.pop("date_hint")
+        self.assertFalse(same_event(self.DATED, other))
+
+    def test_種別が違えば束ねない(self):
+        other = dict(self.POST, categories=["goods"])
+        self.assertFalse(same_event(self.DATED, other))
+
+    def test_日程の無いもの同士は束ねない(self):
+        # グッズの再販と POP UP SHOP を取り違えた件の再発防止
+        a = {"title": "ねんどろいど再販", "url": "https://a/", "source": "A",
+             "matches": [{"label": "銀河英雄伝説"}], "categories": ["goods"],
+             "date_hint": "2026年9月"}
+        b = {"title": "POP UP SHOP 開催", "url": "https://b/", "source": "B",
+             "matches": [{"label": "銀河英雄伝説"}], "categories": ["goods"],
+             "date_hint": "2026年9月"}
+        self.assertFalse(same_event(a, b))

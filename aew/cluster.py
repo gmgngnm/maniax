@@ -123,6 +123,33 @@ def _overlaps(a: dict, b: dict) -> bool:
     return left[0] <= right[1] and right[0] <= left[1]
 
 
+_HINT_MONTH = re.compile(r"(20\d{2})\s*年\s*(\d{1,2})\s*月")
+
+
+def _hint_month(item: dict) -> str | None:
+    """「2026年11月」という手がかりから YYYY-MM を取り出す。"""
+    found = _HINT_MONTH.search(item.get("date_hint") or "")
+    return f"{found.group(1)}-{int(found.group(2)):02d}" if found else None
+
+
+def _hint_inside_span(a: dict, b: dict) -> bool:
+    """片方の会期に、もう片方の「○年○月」が収まるか。
+
+    X の投稿は「11月開催決定」としか書かないことが多く、会期を持たない
+    ので `_overlaps` では登録済みの行と結び付かない。実際、小田原の
+    展覧会が X 経由で 2 度も 2 行目になった。月まで分かっているなら、
+    会期の月と突き合わせれば足りる。
+    """
+    for dated, undated in ((a, b), (b, a)):
+        span = _span(dated)
+        month = _hint_month(undated)
+        if not span or _span(undated) or not month:
+            continue
+        if span[0][:7] <= month <= span[1][:7]:
+            return True
+    return False
+
+
 def same_event(a: dict, b: dict) -> bool:
     """2 件が同じ催しを指しているか。"""
     shared_labels = _labels(a) & _labels(b)
@@ -139,8 +166,8 @@ def same_event(a: dict, b: dict) -> bool:
     if shared >= SHARED_TERMS_REQUIRED:
         return True
 
-    # 固有名詞が 1 つしか重ならなくても、同種の催しで会期が重なるなら同一とみなす
-    if shared and _overlaps(a, b):
+    # 固有名詞が 1 つしか重ならなくても、同種の催しで時期が重なるなら同一とみなす
+    if shared and (_overlaps(a, b) or _hint_inside_span(a, b)):
         if set(a.get("categories", [])) & set(b.get("categories", [])):
             return True
     return False
