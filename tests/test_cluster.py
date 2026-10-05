@@ -7,8 +7,8 @@
 
 import unittest
 
-from aew.cluster import (collapse, distinctive_terms, group, related,
-                         same_event, signal_text, title_similarity)
+from aew.cluster import (collapse, distinctive_terms, group, quoted_names,
+                         related, same_event, signal_text, title_similarity)
 
 ODAWARA_A = {
     "title": "富野由悠季の原点に迫る！「機動戦士ガンダム」富野監督の展覧会が小田原城などで11月開催",
@@ -348,3 +348,53 @@ class TestMonthHintBridgesToSpan(unittest.TestCase):
              "matches": [{"label": "銀河英雄伝説"}], "categories": ["goods"],
              "date_hint": "2026年9月"}
         self.assertFalse(same_event(a, b))
+
+
+class TestQuotedEventNames(unittest.TestCase):
+    """「」で囲まれた催し名が一致すれば同じ催し。
+
+    「富野由悠季展（仮）」の記事が 2 本、固有名詞が「開催決定」1 つしか
+    重ならず別の行になった。日本語の告知は催しの正式名を囲みに入れるので、
+    数を数えるよりこれを見る方が強い。
+    """
+
+    def _row(self, title, cats, label="富野由悠季"):
+        return {"title": title, "url": f"https://example.com/{hash(title)}",
+                "source": "x", "published": "",
+                "matches": [{"label": label}], "categories": list(cats)}
+
+    def test_同じ催し名なら束ねる(self):
+        a = self._row("「富野由悠季展（仮）」が開催決定！ガンダム50周年となる2029 ...",
+                      ["exhibition"])
+        b = self._row("「富野由悠季展（仮）」2029年に東京国立博物館で開催決定",
+                      ["exhibition"])
+        self.assertTrue(same_event(a, b))
+        self.assertEqual(1, len(group([a, b])))
+
+    def test_種別が違えば束ねない(self):
+        # 同じ作品の展示とグッズが、作品名を囲んだだけで潰れないこと
+        a = self._row("「装甲騎兵ボトムズ」総合模型演習2026 開催", ["exhibition"],
+                      label="ボトムズ")
+        b = self._row("「装甲騎兵ボトムズ」オリジナルグッズ発売", ["goods"],
+                      label="ボトムズ")
+        self.assertFalse(same_event(a, b))
+
+    def test_作品名そのものは手がかりにしない(self):
+        # 囲みの中身がウォッチリストの作品名と同じなら、何の証拠にもならない
+        a = self._row("「銀河英雄伝説」POP UP SHOP開催", ["exhibition"],
+                      label="銀河英雄伝説")
+        b = self._row("「銀河英雄伝説」原画展を開催", ["exhibition"],
+                      label="銀河英雄伝説")
+        self.assertFalse(same_event(a, b))
+
+    def test_人物名を含む催し名は残す(self):
+        # 部分一致で落とすと「富野由悠季展」まで消える
+        self.assertEqual({"富野由悠季展仮"},
+                         quoted_names("「富野由悠季展（仮）」開催", {"富野由悠季"}))
+
+    def test_作品名と完全一致するものだけ落とす(self):
+        self.assertEqual(set(),
+                         quoted_names("「銀河英雄伝説」上映", {"銀河英雄伝説"}))
+
+    def test_短すぎる囲みは拾わない(self):
+        self.assertEqual(set(), quoted_names("「秋」の企画", set()))

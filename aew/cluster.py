@@ -105,6 +105,29 @@ def shared_term_count(terms_a: set[str], terms_b: set[str]) -> int:
     return sum(1 for a in terms_a if any(related(a, b) for b in terms_b))
 
 
+# 「」『』で囲まれた名前。日本語の告知は催しの正式名をここに入れる。
+# 固有名詞の数を数えるより、これが一致する方がずっと強い手がかりになる。
+# 「富野由悠季展（仮）」の記事が 2 本、固有名詞が「開催決定」1 つしか
+# 重ならず別の行になったのが発端。
+_QUOTED = re.compile(r"[「『]([^「」『』]{4,40})[」』]")
+
+
+def quoted_names(text: str, exclude: set[str] | None = None) -> set[str]:
+    """囲みの中の名前を集める。作品名そのものは除く。
+
+    除くのは**完全に一致する**ものだけ。「銀河英雄伝説」は作品名なので
+    落とすが、「富野由悠季展（仮）」は催しの名前なので残す。部分一致で
+    落とすと、人物名を含む催し名まで消えてしまう。
+    """
+    keys = {normalize_loose(label) for label in (exclude or set())}
+    found = set()
+    for match in _QUOTED.finditer(unicodedata.normalize("NFKC", text)):
+        key = normalize_loose(match.group(1))
+        if key and key not in keys:
+            found.add(key)
+    return found
+
+
 def _labels(item: dict) -> set[str]:
     return {m.get("label", "") for m in item.get("matches", []) if m.get("label")}
 
@@ -158,6 +181,14 @@ def same_event(a: dict, b: dict) -> bool:
 
     text_a, text_b = signal_text(a), signal_text(b)
     if title_similarity(text_a, text_b) >= TITLE_SIMILARITY_STRONG:
+        return True
+
+    # 同じ催し名が「」で囲まれて両方に出てくるなら、ほぼ同じ催し。
+    # ただし種別も重なることを要る。同じ作品の展示とグッズが、作品名を
+    # 囲んだだけで 1 行に潰れてしまわないように。
+    shared_quoted = (quoted_names(text_a, shared_labels)
+                     & quoted_names(text_b, shared_labels))
+    if shared_quoted and set(a.get("categories", [])) & set(b.get("categories", [])):
         return True
 
     terms_a = distinctive_terms(text_a, shared_labels)
