@@ -152,3 +152,43 @@ class TestListingUrls(unittest.TestCase):
             "source": "アニメイト", "published": "",
         }
         self.assertIsNone(evaluate(candidate, watchlist))
+
+
+class TestExhibitionSuffix(unittest.TestCase):
+    """「◯◯展」という形を規則で拾う。
+
+    ボトムズのジオラマ展が、語彙表に「ジオラマ展」が無いせいで
+    「イベントではない」と判定され、1 か月の展示をまるごと
+    見落としかけた。語を足し続けるのではなく形で拾う。
+    """
+
+    EXHIBITIONS = [
+        "ジオラマ展「装甲騎兵ボトムズ総合模型演習2026」が北千住マルイで開催",
+        "いのまたむつみ回顧展、名古屋で開催",
+        "よつばと！原画展",
+        "模型展を開く",
+        "個展のお知らせ",
+    ]
+    NOT_EXHIBITIONS = [
+        "シリーズは大きく発展した",
+        "話が進展した",
+        "物語が展開する",
+        "今後の展望を語った",
+    ]
+
+    def test_展で終わる語は展示とみなす(self):
+        for text in self.EXHIBITIONS:
+            with self.subTest(text=text):
+                self.assertIn("exhibition", classify(text))
+
+    def test_普通の熟語は展示にしない(self):
+        for text in self.NOT_EXHIBITIONS:
+            with self.subTest(text=text):
+                self.assertNotIn("exhibition", classify(text))
+
+    def test_種別を絞っていれば足さない(self):
+        self.assertEqual([], classify("ジオラマ展が開催", enabled={"goods"}))
+
+    def test_二重に足さない(self):
+        hits = classify("よつばと！原画展の開催")
+        self.assertEqual(1, hits.count("exhibition"))

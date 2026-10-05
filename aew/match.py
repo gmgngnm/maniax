@@ -30,6 +30,7 @@ CATEGORY_KEYWORDS: dict[str, tuple[str, ...]] = {
         # 「富野由悠季展の開催」のように、固有名＋「展」で書かれる形。
         # 「展」単独だと「展開」「発展」に当たるので、後続の語まで含めて見る。
         "展の開催", "展が開催", "展を開催", "展開催", "展の詳細",
+        # これらに当たらない「◯◯展」は _EXHIBITION_SUFFIX が拾う
     ),
     "goods": (
         "グッズ", "受注生産", "予約受付", "予約開始", "通販",
@@ -59,6 +60,21 @@ _EXCLUDE = (
 )
 
 
+# 「ジオラマ展」「模型展」「回顧展」のように、固有名＋「展」で終わる語。
+# 日本語ではこの形はほぼ展覧会を指すので、語を数え上げるより規則で拾う。
+# 実際、ボトムズのジオラマ展が「ジオラマ展」という語を持たない語彙表から
+# こぼれ、1 か月の展示をまるごと見落としかけた。
+#
+# 「発展」「進展」のような普通の熟語（直前の字で除く）と、「展開」「展望」
+# のように「展」で始まる語（直後の字で除く）には当たらないようにする。
+# 「展示会」「展覧会」は上の語彙表が拾う。
+_EXHIBITION_SUFFIX = re.compile(r"(?<![発進親伸])展(?![開望示覧])")
+
+
+def _has_exhibition_suffix(text: str) -> bool:
+    return bool(_EXHIBITION_SUFFIX.search(normalize(text)))
+
+
 def classify(text: str, enabled: set[str] | None = None) -> list[str]:
     """テキストから該当するイベント種別を返す。空リストなら「イベントではない」。"""
     key = normalize(text)
@@ -70,6 +86,10 @@ def classify(text: str, enabled: set[str] | None = None) -> list[str]:
             continue
         if any(normalize(word) in key for word in words):
             hits.append(category)
+    if ("exhibition" not in hits
+            and (enabled is None or "exhibition" in enabled)
+            and _has_exhibition_suffix(text)):
+        hits.append("exhibition")
     return hits
 
 
@@ -155,6 +175,12 @@ def evaluate(candidate: dict, watchlist: dict) -> dict | None:
         "title": title,
         "url": candidate.get("url", ""),
         "summary": candidate.get("summary", ""),
+        # 日付はここからしか読まない。要約は収集側が書いた文章なので、
+        # 年が落ちていたり言い換えられていたりする。検索結果の文面を
+        # そのまま後段に渡すこと。ここで捨てていたせいで、年つきで
+        # 書かれている日程を読み落とし、「日付が読み取れない」として
+        # 伏せていた（ボトムズのジオラマ展で発覚）。
+        "snippet": candidate.get("snippet", ""),
         "source": candidate.get("source", ""),
         "published": candidate.get("published", ""),
         "categories": categories,

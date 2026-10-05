@@ -6,6 +6,7 @@ from pathlib import Path
 
 from aew.digest import calendar_events, push_line
 from aew.ingest import run
+from aew.match import evaluate
 from aew.store import SeenStore
 
 TODAY = date(2026, 9, 10)
@@ -242,3 +243,44 @@ class TestCalendarEndDate(unittest.TestCase):
     def test_exclusive_end_crosses_month_and_year(self):
         event = self._event("2026-12-31", None)
         self.assertEqual(event["end_date_exclusive"], "2027-01-01")
+
+
+class TestSnippetReachesDateParsing(unittest.TestCase):
+    """検索結果の文面（snippet）が日付解析まで届くこと。
+
+    収集の手順書は「日付は snippet からしか読まない」と定めているのに、
+    evaluate() が snippet を落としていたので、ingest には届いていなかった。
+    年つきで書かれた日程を読み落とし、「日付が読み取れない」として
+    伏せ続けていた（ボトムズのジオラマ展で発覚）。
+    """
+
+    WATCHLIST = {"works": [{"title": "ボトムズ"}], "people": [],
+                 "settings": {}}
+
+    def test_evaluate_がsnippetを引き継ぐ(self):
+        item = evaluate({
+            "title": "ジオラマ展「装甲騎兵ボトムズ総合模型演習2026」開催決定",
+            "url": "https://example.com/a",
+            "summary": "北千住マルイで開催。",
+            "snippet": "2026年10月9日(金)〜11月8日(日)、北千住マルイ7階にて開催。",
+            "source": "V-STORAGE", "published": "",
+        }, self.WATCHLIST)
+        self.assertIsNotNone(item)
+        self.assertIn("2026年10月9日", item["snippet"])
+
+    def test_要約に年が無くてもsnippetの年で日程が出る(self):
+        # 要約は「10月25日のサイン会」から先に当たってしまう。年つきの
+        # 会期は snippet にしかない。
+        store = SeenStore(Path(tempfile.mkdtemp()) / "seen.json")
+        items = run([{
+            "title": "ジオラマ展「装甲騎兵ボトムズ総合模型演習2026」開催決定",
+            "url": "https://example.com/a",
+            "summary": "北千住マルイで開催。会期中にサイン会（10月25日）も実施。",
+            "snippet": "2026年10月9日(金)〜11月8日(日)、北千住マルイ7階にて開催。",
+            "source": "V-STORAGE", "published": "",
+        }], self.WATCHLIST, store, date(2026, 10, 5))
+
+        self.assertEqual(1, len(items))
+        self.assertEqual("2026-10-09", items[0]["event"]["start"])
+        self.assertEqual("2026-11-08", items[0]["event"]["end"])
+        self.assertEqual("", items[0]["date_note"])
