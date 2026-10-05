@@ -173,6 +173,8 @@ def main(argv=None) -> int:
         "count": len(items),
         "items": items,
         "push": digest.push_line(items),
+        # 端末への通知はこれをそのまま貼る（文面を作り直させない）
+        "push_bullets": digest.push_bullets(items),
         "email_subject": digest.email_subject(items, today),
         "email_body": digest.email_body(items, today),
         "calendar_events": digest.calendar_events(items),

@@ -1,7 +1,11 @@
 """通知用のダイジェストを組み立てる。
 
-Push は文字数が限られるので一行、メールは一覧、カレンダーは日程付きのものだけ、
-と出力先ごとに形を変える。
+端末への通知は新着の箇条書きだけ、メールは一覧、カレンダーは日程付きの
+ものだけ、と出力先ごとに形を変える。
+
+通知の文面をここで完全に決めてしまうのは意図的。巡回側に composeさせると
+経過報告やエラーの顛末が混ざり、肝心の新着が埋もれる。巡回は
+`push_bullets` をそのまま貼るだけでよい。
 """
 
 from datetime import date, timedelta
@@ -54,6 +58,35 @@ def push_line(items: list[dict]) -> str:
     tail = f" ほか{rest}件" if rest > 0 else ""
     line = f"{_format_period(head)} {head['title']}{tail}"
     return line[:197] + "…" if len(line) > 200 else line
+
+
+def push_bullets(items: list[dict], limit: int = 6) -> str:
+    """端末への通知にそのまま出す箇条書き。
+
+    1 行目が件数、以降が「日程 [種別] 件名」。経過もエラーも入れない。
+    画面に収まらないほど並べても読まれないので、多いときは末尾で丸める。
+    """
+    if not items:
+        return ""
+
+    ordered = sorted(items, key=_sort_key)
+    lines = [f"新着{len(ordered)}件"]
+    for item in ordered[:limit]:
+        cats = "・".join(
+            CATEGORY_LABELS.get(c, c) for c in item.get("categories", [])
+        )
+        head = f"- {_format_period(item)}"
+        if cats:
+            head += f" [{cats}]"
+        lines.append(f"{head} {_trim(item.get('title', ''), 40)}")
+    if len(ordered) > limit:
+        lines.append(f"- ほか{len(ordered) - limit}件")
+    return "\n".join(lines)
+
+
+def _trim(text: str, width: int) -> str:
+    text = " ".join(text.split())
+    return text if len(text) <= width else text[: width - 1] + "…"
 
 
 def email_subject(items: list[dict], today: date) -> str:
