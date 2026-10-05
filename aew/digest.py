@@ -63,8 +63,11 @@ def push_line(items: list[dict]) -> str:
 def push_bullets(items: list[dict], limit: int = 6) -> str:
     """端末への通知にそのまま出す箇条書き。
 
-    1 行目が件数、以降が「日程 [種別] 件名」。経過もエラーも入れない。
+    1 行目が件数、以降は催しの名前だけ。経過もエラーも入れない。
     画面に収まらないほど並べても読まれないので、多いときは末尾で丸める。
+
+    並び順は日程の近い順（未定は後ろ）。日程そのものは出さないが、
+    上から順に近いものが並ぶ。
     """
     if not items:
         return ""
@@ -72,13 +75,10 @@ def push_bullets(items: list[dict], limit: int = 6) -> str:
     ordered = sorted(items, key=_sort_key)
     lines = [f"新着{len(ordered)}件"]
     for item in ordered[:limit]:
-        cats = "・".join(
-            CATEGORY_LABELS.get(c, c) for c in item.get("categories", [])
-        )
-        head = f"- {_format_period(item)}"
-        if cats:
-            head += f" [{cats}]"
-        lines.append(f"{head} {_trim(item.get('title', ''), 40)}")
+        # 行頭は催しの名前。日程も種別も置かない（通知で真っ先に目に入る
+        # のが日付だと、何の話か分からないまま読み飛ばされる）。日程は
+        # メール・カレンダー・GUI にある。
+        lines.append(f"- {_trim(item.get('title', ''), 56)}")
     if len(ordered) > limit:
         lines.append(f"- ほか{len(ordered) - limit}件")
     return "\n".join(lines)
