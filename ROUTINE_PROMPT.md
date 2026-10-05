@@ -78,16 +78,26 @@ cd /home/user/maniax && python3 -m aew.inbox \
 
 クラウド側からは X に到達できないため、利用者が手元の PC で集めた投稿が
 `inbox/` に置かれていることがある。通常の検索結果と結合して同じ扱いにする。
-`--consume` で取り込んだファイルは消えるので、手順の最後のコミットに
-その削除も含めること。
+`--consume` で取り込んだファイルは消えるが、**このリポジトリには push できない**
+（下記「状態の置き場所」）。消えたのはコンテナの中だけなので、同じ候補が
+次の巡回でもう一度拾われることがある。重複判定が落とすので害はない。
 
 ## 5. 突き合わせる
 
+通知済みの記録は DB の `control/seen` にある。先に読み出してファイルに落とす。
+
+Artifact ツール: `read_db` (`db_op: "get"`, `collection: "control"`,
+`doc_id: "seen"`, `out_dir: "/tmp/db"`)
+
 ```bash
-cd /home/user/maniax && python3 -m aew.ingest \
-  --watchlist /tmp/watchlist.json --state state/seen.json \
+cd /home/user/maniax
+python3 -m aew.seen_db pull --dir /tmp/db/control --out /tmp/seen.json
+python3 -m aew.ingest \
+  --watchlist /tmp/watchlist.json --state /tmp/seen.json \
   --candidates /tmp/candidates.json --out /tmp/digest.json --commit
 ```
+
+ドキュメントがまだ無くても `pull` は空の記録を用意するので止まらない。
 
 `/tmp/digest.json` の `count` が 0 なら**通知も DB 書き込みも行わず**、
 手順 8 のコミットだけ行って終了する。無風の日に通知を送ると、
@@ -139,19 +149,23 @@ Gmail や Google カレンダーのツールが使えない場合は、無理に
 その旨をはっきり報告したうえで `email_body` の内容を回答本文に全文書き出す。
 GUI への書き込み（手順 6）は成功していれば、情報自体は失われない。
 
-## 8. 状態をコミットする
+## 8. 通知済みの記録を書き戻す
 
-```bash
-cd /home/user/maniax
-cp /tmp/watchlist.json watchlist.json   # GUI 側の変更をリポジトリにも残す
-git add state/seen.json watchlist.json
-git diff --cached --quiet || git -c user.email=gao2stego@gmail.com -c user.name="Osakaya" \
-  commit -m "state: $(date +%Y-%m-%d) の巡回結果を記録"
-git push origin main
-```
+**git にコミットも push もしないこと。** この Routine が起こすセッションには
+このリポジトリへの push 権限が無い。clone と pull は通る（公開リポジトリ）が、
+push は必ず失敗する。以前はここで push していたため、毎朝その失敗だけが
+利用者の端末に通知されていた。
 
-state を push し損ねると次回に同じイベントを再通知することになるので、
-push の失敗は必ず報告する。
+記録は DB に書き戻す。`write_db`:
+
+- `db_op: "set"`, `collection: "control"`, `doc_id: "seen"`,
+  `file_path: "/tmp/seen.json"`
+
+新着が 0 件でも**この書き戻しは必ず行う**。飛ばすと記録が残らず、
+次の巡回で同じ記事をまた「新着」として通知してしまう。
+
+`watchlist.json`（DB の代替）の更新もリポジトリには残せない。DB が正なので
+情報は失われない。
 
 ## 判断に迷ったとき
 

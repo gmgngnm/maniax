@@ -1,7 +1,12 @@
 """通知済みイベントの記録。
 
-Routine は毎回まっさらなセッションで動くので、状態はリポジトリの
-state/seen.json に置いて git で持ち回る。
+Routine は毎回まっさらなセッションで動くので、記録をどこかに預けないと
+毎回まっさらになり、同じ記事を何度も「新着」として通知してしまう。
+
+置き場所はアーティファクトの DB（`control/seen`）。以前はリポジトリの
+state/seen.json に置いて git で持ち回る形にしていたが、Routine が起こす
+セッションにはこのリポジトリへの push 権限が無く、毎回 push に失敗して
+いた。記録は一度も残らず、毎朝その失敗だけが通知されていた。
 """
 
 import json
@@ -10,8 +15,10 @@ from pathlib import Path
 
 from .normalize import fingerprint
 
-# これより古い記録は捨てる。再通知の心配がなくなる程度に長く取る。
-RETENTION_DAYS = 400
+# これより古い記録は捨てる。DB の 1 ドキュメントに収める必要があるので
+# 無制限には伸ばせない。verify 側が半年より古い記事をそもそも候補にしない
+# ので、それより少し長く持てば再通知は起こらない。
+RETENTION_DAYS = 240
 
 
 class SeenStore:
@@ -58,7 +65,8 @@ class SeenStore:
 
     def save(self) -> None:
         self.path.parent.mkdir(parents=True, exist_ok=True)
-        payload = {"version": 1, "entries": self.entries}
+        # そのまま DB の 1 ドキュメントになるので、余計なキーを置かない
+        payload = {"entries": self.entries}
         self.path.write_text(
             json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
             encoding="utf-8",
