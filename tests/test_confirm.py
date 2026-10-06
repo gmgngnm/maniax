@@ -1,9 +1,13 @@
 """本文照合。スニペットに無い年を本文から取れるか。"""
 
+import json
+import tempfile
 import unittest
+from pathlib import Path
+from unittest import mock
 
 from aew.confirm import (CONFIRMED, CONSISTENT, CONTRADICTED, INCONCLUSIVE,
-                         UNREACHABLE, check, confirm_item)
+                         UNREACHABLE, check, confirm_item, main)
 from aew.fetch import FetchError
 
 
@@ -80,6 +84,37 @@ class TestConfirmItem(unittest.TestCase):
         item = {"event": {"start": "2026-10-01"}}
         confirm_item(item, fetcher=lambda url: "unused")
         self.assertEqual(item["date_confidence"], INCONCLUSIVE)
+
+
+class TestRebuildsNotice(unittest.TestCase):
+    """本文照合のあとに通知の文面を作り直すこと。
+
+    照合で日付が消えたり、同じ催しがまとまったりして件数が変わる。
+    `push_bullets` だけ作り直し忘れていたので、巡回が貼る箇条書きが
+    照合前の件数を名乗っていた。
+    """
+
+    def test_箇条書きも作り直す(self):
+        tmp = Path(tempfile.mkdtemp())
+        digest = tmp / "digest.json"
+        out = tmp / "out.json"
+        digest.write_text(json.dumps({
+            "generated_at": "2026-10-05",
+            "count": 9,
+            "push_bullets": "新着9件\n- 照合前の古い文面",
+            "items": [{"title": "装甲騎兵ボトムズ総合模型演習2026",
+                       "url": "https://example.com/a",
+                       "categories": ["exhibition"],
+                       "event": {"start": "2026-10-09", "end": "2026-11-08"}}],
+        }, ensure_ascii=False), encoding="utf-8")
+
+        with mock.patch("aew.confirm.confirm_all", side_effect=lambda items: items):
+            self.assertEqual(0, main(["--digest", str(digest), "--out", str(out)]))
+
+        rebuilt = json.loads(out.read_text(encoding="utf-8"))
+        self.assertEqual(
+            "新着1件\n- 装甲騎兵ボトムズ総合模型演習2026",
+            rebuilt["push_bullets"])
 
 
 if __name__ == "__main__":

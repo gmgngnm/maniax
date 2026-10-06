@@ -154,6 +154,7 @@ def main(argv=None) -> int:
     digest["items"] = items
     digest["count"] = len(items)
     digest["push"] = digest_mod.push_line(items)
+    digest["push_bullets"] = digest_mod.push_bullets(items)
     digest["email_subject"] = digest_mod.email_subject(items, today)
     digest["email_body"] = digest_mod.email_body(items, today)
     digest["calendar_events"] = digest_mod.calendar_events(items)
