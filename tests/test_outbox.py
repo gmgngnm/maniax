@@ -19,7 +19,7 @@ from aew.outbox import build_row, doc_id, main, should_send
 DIGEST = {
     "count": 2,
     "push_bullets": "新着2件\n- 装甲騎兵ボトムズ総合模型演習2026",
-    "email_subject": "[アニメ情報] 新着2件",
+    "email_subject": "10/06 新着2件（ウォッチ対象2件）",
     "email_body": "装甲騎兵ボトムズ総合模型演習2026\n2026年10月9日(金)〜11月8日(日)",
 }
 

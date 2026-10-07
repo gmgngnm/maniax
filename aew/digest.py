@@ -90,8 +90,9 @@ def _trim(text: str, width: int) -> str:
 
 
 def email_subject(items: list[dict], today: date) -> str:
+    """件名。先頭に飾りを付けない（利用者の指示で `[アニメ情報]` を外した）。"""
     watched = sum(1 for i in items if i.get("watched"))
-    return f"[アニメ情報] {today:%m/%d} 新着{len(items)}件（ウォッチ対象{watched}件）"
+    return f"{today:%m/%d} 新着{len(items)}件（ウォッチ対象{watched}件）"
 
 
 def email_body(items: list[dict], today: date) -> str:
