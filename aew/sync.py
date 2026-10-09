@@ -133,7 +133,7 @@ def to_writes(digest: dict) -> list[dict]:
     return writes
 
 
-def _event_from_db(doc_id: str, data: dict) -> dict:
+def event_from_db(doc_id: str, data: dict) -> dict:
     """GUI に入っている行を、突き合わせに使える形に戻す。"""
     start = data.get("start")
     return {
@@ -155,6 +155,9 @@ def _event_from_db(doc_id: str, data: dict) -> dict:
         "calendar_event_id": data.get("calendarEventId", ""),
         "status": "known",
     }
+
+
+_event_from_db = event_from_db  # 旧名
 
 
 def merge_existing(existing: list[dict], fresh: list[dict],
@@ -277,7 +280,7 @@ def main(argv=None) -> int:
         payload = result
     elif args.command == "merge-existing":
         existing = [
-            _event_from_db(path.stem, json.loads(path.read_text(encoding="utf-8")))
+            event_from_db(path.stem, json.loads(path.read_text(encoding="utf-8")))
             for path in sorted(Path(args.existing_dir).glob("*.json"))
         ]
         digest = json.loads(Path(args.digest).read_text(encoding="utf-8"))

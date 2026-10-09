@@ -195,8 +195,15 @@ date -u +%Y-%m-%dT%H:%M:%SZ
 ために、digest から運ぶ CLI を用意してあります。
 
 ```bash
-cd /home/user/maniax && python3 -m aew.outbox --digest /tmp/digest.json --out /tmp/outbox.json --kind full
+cd /home/user/maniax && python3 -m aew.outbox --digest /tmp/digest.json --writes /tmp/writes.json --existing-dir /tmp/db/events --out /tmp/outbox.json --kind full
 ```
+
+**`--writes` と `--existing-dir` を必ず渡すこと。** digest は突き合わせ前の
+各記事の見え方なので、既存の行に畳まれたあとの正しい日程を知りません。
+2026-10-09 に、確定済みの小田原の展覧会（11/6〜12/6、カレンダー登録済み）を
+報じた別記事が別会場の会期だけを載せており、digest から作った文面がそれを
+「日程判明」として送ろうとしました。畳んだあとの行から作れば、日程が
+変わっていない行は落ちます。
 
 `skip:` と表示されたら（新着なし）何もせず手順 9-4 へ。
 `doc_id:` が表示されたら、その値を使って書き込みます。
