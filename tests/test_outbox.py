@@ -130,6 +130,30 @@ class TestNewsItems(unittest.TestCase):
         writes = [{"op": "delete", "collection": "events", "doc_id": "doc_odawara"}]
         self.assertEqual([], news_items(writes, self.tmp))
 
+    def test_時期が分からない行は知らせない(self):
+        """2026-10-19 の事故: 2023 年 10 月に終わった原画展が新着になった。
+
+        日付も公開日も年月の記載も無い候補は、過去か未来かを判定できない。
+        GUI には残すが、メールには出さない。
+        """
+        rows = news_items([self._write("doc_old_art", {
+            "title": "最終兵器彼女原画展",
+            "url": "https://anime.eiga.com/event/162598",
+            "start": None, "end": None, "published": "",
+            "categories": ["exhibition"],
+            "matches": [{"label": "最終兵器彼女"}],
+            "unverifiable": True,
+        })], self.tmp)
+        self.assertEqual([], rows)
+
+    def test_時期が分かれば日付が無くても知らせる(self):
+        # 「2029年に開催予定」のように年が分かっているものは落とさない
+        rows = news_items([self._write("doc_2029", {
+            "title": "「富野由悠季展（仮）」2029年に東京国立博物館で開催決定",
+            "start": None, "end": None, "unverifiable": False,
+        })], self.tmp)
+        self.assertEqual(["new"], [r["status"] for r in rows])
+
     def test_既存ディレクトリが無くても落ちない(self):
         rows = news_items([self._write("doc_new", {"title": "A", "start": None})], None)
         self.assertEqual(["new"], [r["status"] for r in rows])
