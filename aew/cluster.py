@@ -112,6 +112,30 @@ def shared_term_count(terms_a: set[str], terms_b: set[str]) -> int:
 _QUOTED = re.compile(r"[「『]([^「」『』]{4,40})[」』]")
 
 
+# 囲みの中の名前が、もう片方では囲まれずに出てくることもある。X の投稿は
+# 「Anime Voice on X: 富野由悠季展（仮）」のように、アカウント名の後ろに
+# 催し名が裸で並ぶ。囲みの一致だけを見ていたので、同じ告知を報じた記事と
+# 投稿が GUI の別の行になった（2026-11-06）。
+_QUOTED_MIN_LOOSE = 6
+
+
+def quoted_name_in_text(a: dict | str, b: dict | str,
+                        exclude: set[str] | None = None) -> bool:
+    """片方が囲んだ催し名が、もう片方の文中にそのまま出てくるか。
+
+    短い名前で誤って結びつけないよう、正規化して 6 文字以上に限る。
+    """
+    text_a = a if isinstance(a, str) else signal_text(a)
+    text_b = b if isinstance(b, str) else signal_text(b)
+    loose_a, loose_b = normalize_loose(text_a), normalize_loose(text_b)
+    for name, other in ((quoted_names(text_a, exclude), loose_b),
+                        (quoted_names(text_b, exclude), loose_a)):
+        for key in name:
+            if len(key) >= _QUOTED_MIN_LOOSE and key in other:
+                return True
+    return False
+
+
 def quoted_names(text: str, exclude: set[str] | None = None) -> set[str]:
     """囲みの中の名前を集める。作品名そのものは除く。
 
@@ -188,6 +212,9 @@ def same_event(a: dict, b: dict) -> bool:
     # 囲んだだけで 1 行に潰れてしまわないように。
     shared_quoted = (quoted_names(text_a, shared_labels)
                      & quoted_names(text_b, shared_labels))
+    if not shared_quoted:
+        # 片方だけが囲んでいる場合も拾う（X の投稿は囲みを持たない）
+        shared_quoted = quoted_name_in_text(text_a, text_b, shared_labels)
     if shared_quoted and set(a.get("categories", [])) & set(b.get("categories", [])):
         return True
 

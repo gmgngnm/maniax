@@ -119,6 +119,49 @@ class TestCollapse(unittest.TestCase):
         self.assertEqual(rean["title"], REAN["title"])
 
 
+class TestQuotedNameInText(unittest.TestCase):
+    """囲みが片方だけでも、同じ催しとしてまとめる。
+
+    2026-11-06 の事故: 「富野由悠季展（仮）」の 2029 年開催を報じた記事
+    （囲みあり）と、同じ告知の X の投稿「Anime Voice on X: 富野由悠季展
+    （仮）」（囲みなし）が GUI の別の行になった。
+    """
+
+    ARTICLE = {
+        "title": "「富野由悠季展（仮）」2029年に東京国立博物館で開催決定",
+        "summary": "ガンダム50周年プロジェクトの一環として発表された。",
+        "url": "https://gundam-official.com/news/pqtagfcv7mmp7ea4hx5dp9nw",
+        "categories": ["exhibition"],
+        "matches": [{"kind": "person", "label": "富野由悠季", "role": "監督"}],
+    }
+    POST = {
+        "title": "Anime Voice on X: 富野由悠季展（仮）",
+        "summary": "富野由悠季展（仮） 東京国立博物館",
+        "url": "https://x.com/Anime_Voice/status/2055222114878476663",
+        "categories": ["exhibition"],
+        "matches": [{"kind": "person", "label": "富野由悠季", "role": "監督"}],
+    }
+
+    def test_囲みが片方だけでも同じ催し(self):
+        self.assertTrue(same_event(self.ARTICLE, self.POST))
+
+    def test_種別が違えばまとめない(self):
+        goods = dict(self.POST, categories=["goods"])
+        self.assertFalse(same_event(self.ARTICLE, goods))
+
+    def test_作品名だけの一致ではまとめない(self):
+        # 「銀河英雄伝説」はウォッチ対象の作品名。これで結びつけては
+        # 展示とグッズが 1 行に潰れる
+        a = {"title": "「銀河英雄伝説」4Kリマスター上映",
+             "categories": ["revival"],
+             "matches": [{"kind": "work", "label": "銀河英雄伝説"}]}
+        b = {"title": "銀河英雄伝説 POP UP SHOP 開催",
+             "categories": ["revival"],
+             "matches": [{"kind": "work", "label": "銀河英雄伝説"}]}
+        self.assertFalse(same_event(a, b))
+
+
+
 if __name__ == "__main__":
     unittest.main()
 
