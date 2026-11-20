@@ -118,19 +118,42 @@ _QUOTED = re.compile(r"[「『]([^「」『』]{4,40})[」』]")
 # 投稿が GUI の別の行になった（2026-11-06）。
 _QUOTED_MIN_LOOSE = 6
 
+# ただし、囲みの中にあるのが**作品名そのもの**だと手がかりにならない。
+# 「装甲騎兵ボトムズ」はその作品のどの記事にも出てくるので、これで
+# 結びつけると無関係な催しが 1 行に潰れる。2026-11-19 に、カレンダー
+# 登録済みのグッズ行（墓場の画廊、10/9〜11/8）へ『灰色の魔女』の公開
+# 告知が畳まれ、会期を上書きしたうえ舞台挨拶の行まで消す書き込みが
+# 出かかった（巡回が気づいて書き込みを止めた）。
+#
+# 催しの名前には、種別を示す語がたいてい入っている。それを持つ名前だけを
+# 手がかりに使う。語の並びは match.py の CATEGORY_KEYWORDS と同じ発想。
+# 「展」は「展開」「発展」に当たるので、前後を見て外す。
+_EVENT_NAME_MARKER = re.compile(
+    r"(?<![発進親伸])展(?![開望示覧])"
+    r"|演習|上映|公演|祭|フェア|フェス|イベント|回顧"
+    r"|ライブ|コンサート|ショップ|ストア|カフェ"
+    r"|shop|store|cafe|fes|popup|pop\s?up|exhibition"
+)
+
+
+def event_like_names(names: set[str]) -> set[str]:
+    """催しの名前らしいものだけを残す。作品名そのものは落とす。"""
+    return {name for name in names if _EVENT_NAME_MARKER.search(name)}
+
 
 def quoted_name_in_text(a: dict | str, b: dict | str,
                         exclude: set[str] | None = None) -> bool:
     """片方が囲んだ催し名が、もう片方の文中にそのまま出てくるか。
 
     短い名前で誤って結びつけないよう、正規化して 6 文字以上に限る。
+    作品名そのもの（種別を示す語を含まない名前）は手がかりにしない。
     """
     text_a = a if isinstance(a, str) else signal_text(a)
     text_b = b if isinstance(b, str) else signal_text(b)
     loose_a, loose_b = normalize_loose(text_a), normalize_loose(text_b)
     for name, other in ((quoted_names(text_a, exclude), loose_b),
                         (quoted_names(text_b, exclude), loose_a)):
-        for key in name:
+        for key in event_like_names(name):
             if len(key) >= _QUOTED_MIN_LOOSE and key in other:
                 return True
     return False
@@ -210,8 +233,8 @@ def same_event(a: dict, b: dict) -> bool:
     # 同じ催し名が「」で囲まれて両方に出てくるなら、ほぼ同じ催し。
     # ただし種別も重なることを要る。同じ作品の展示とグッズが、作品名を
     # 囲んだだけで 1 行に潰れてしまわないように。
-    shared_quoted = (quoted_names(text_a, shared_labels)
-                     & quoted_names(text_b, shared_labels))
+    shared_quoted = (event_like_names(quoted_names(text_a, shared_labels))
+                     & event_like_names(quoted_names(text_b, shared_labels)))
     if not shared_quoted:
         # 片方だけが囲んでいる場合も拾う（X の投稿は囲みを持たない）
         shared_quoted = quoted_name_in_text(text_a, text_b, shared_labels)

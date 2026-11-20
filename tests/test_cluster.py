@@ -162,6 +162,64 @@ class TestQuotedNameInText(unittest.TestCase):
 
 
 
+class TestWorkTitleIsNotAnEventName(unittest.TestCase):
+    """囲みの中が作品名そのものなら、手がかりにしない。
+
+    2026-11-19 の事故: カレンダー登録済みのグッズ行（墓場の画廊、
+    10/9〜11/8）へ『装甲騎兵ボトムズ 灰色の魔女』の公開告知が畳まれ、
+    会期を上書きしたうえ舞台挨拶の行を消す書き込みが出かかった。
+    グッズ行が「装甲騎兵ボトムズ」を囲んでおり、その作品名は告知の
+    文中にも当然出てくるので、片側だけの囲み一致が効いてしまった。
+    """
+
+    GOODS = {
+        "title": "「装甲騎兵ボトムズ」墓場の画廊オリジナルグッズ",
+        "summary": "「装甲騎兵ボトムズ総合模型演習2026」の会場で10月9日より販売。",
+        "url": "https://animeanime.jp/article/2026/09/29/103330.html",
+        "categories": ["goods"],
+        "matches": [{"kind": "work", "label": "ボトムズ"}],
+        "event": {"start": "2026-10-09", "end": "2026-11-08"},
+    }
+    RELEASE = {
+        "title": "映画『装甲騎兵ボトムズ 灰色の魔女』11月20日公開",
+        "summary": "押井守監督。全2部作の第1作が2026年11月20日より全国公開。",
+        "url": "https://animeanime.jp/article/2026/11/09/104631.html",
+        # 入場者特典の記述で goods も付くことがある。付いても畳んではいけない
+        "categories": ["screening_event", "goods"],
+        "matches": [{"kind": "work", "label": "ボトムズ"}],
+        "event": {"start": "2026-11-20", "end": None},
+    }
+    STAGE = {
+        "title": "『装甲騎兵ボトムズ 灰色の魔女』公式 (@votoms_gh) / X",
+        "summary": "灰色の魔女 公開2週目舞台挨拶（TOHOシネマズ六本木ヒルズ）",
+        "url": "https://x.com/votoms_gh",
+        "categories": ["screening_event"],
+        "matches": [{"kind": "work", "label": "ボトムズ"}],
+        "event": None,
+    }
+
+    def test_作品名だけではグッズと公開告知を畳まない(self):
+        self.assertFalse(same_event(self.GOODS, self.RELEASE))
+
+    def test_同じ映画の告知どうしは畳む(self):
+        self.assertTrue(same_event(self.STAGE, self.RELEASE))
+
+    def test_3件がひとつに潰れない(self):
+        groups = group([self.GOODS, self.STAGE, self.RELEASE])
+        self.assertEqual([1, 2], sorted(len(g) for g in groups))
+
+    def test_催し名なら片側の囲みでも効く(self):
+        # 「総合模型演習2026」は種別を示す語（演習）を含む催しの名前
+        article = {"title": "「装甲騎兵ボトムズ総合模型演習2026」開催決定",
+                   "categories": ["exhibition"],
+                   "matches": [{"kind": "work", "label": "ボトムズ"}]}
+        post = {"title": "ボトムズ総合模型演習2026 本日開幕",
+                "categories": ["exhibition"],
+                "matches": [{"kind": "work", "label": "ボトムズ"}]}
+        self.assertTrue(same_event(article, post))
+
+
+
 if __name__ == "__main__":
     unittest.main()
 
