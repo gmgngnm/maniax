@@ -34,13 +34,13 @@
 
 import argparse
 import json
-from datetime import date, datetime, timedelta, timezone
+from datetime import date, datetime, timezone
 from pathlib import Path
 
 from . import digest as digest_mod
+from .dates import JST, today_jst
 from .sync import event_from_db
 
-JST = timezone(timedelta(hours=9))
 
 # 行が「知らせる価値のある更新」かを決める欄。題名の言い回しが変わっただけ
 # では知らせない（同じ催しの別記事を拾うたびにメールが来てしまう）。
@@ -152,7 +152,7 @@ def main(argv=None) -> int:
     if args.writes:
         writes = json.loads(Path(args.writes).read_text(encoding="utf-8"))
         today = date.fromisoformat(
-            digest.get("generated_at") or date.today().isoformat())
+            digest.get("generated_at") or today_jst().isoformat())
         items = news_items(
             writes, Path(args.existing_dir) if args.existing_dir else None)
         before = digest.get("count", 0)

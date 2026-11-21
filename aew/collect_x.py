@@ -27,9 +27,9 @@ X API のトークンがあれば `X_BEARER_TOKEN` に入れておくと、そ�
 
 import argparse
 import json
-from datetime import date
 from pathlib import Path
 
+from .dates import today_jst
 from .sources import x_queries_for
 from .xsearch import search
 
@@ -63,7 +63,7 @@ def collect(watchlist: dict, limit_per_query: int = 25) -> tuple[list[dict], dic
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--watchlist", default="watchlist.json")
-    parser.add_argument("--out", default=f"inbox/{date.today().isoformat()}.json")
+    parser.add_argument("--out", default=f"inbox/{today_jst().isoformat()}.json")
     parser.add_argument("--limit", type=int, default=25)
     args = parser.parse_args()
 

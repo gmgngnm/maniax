@@ -19,7 +19,7 @@ from pathlib import Path
 
 from . import digest
 from .dates import (mentions_bare_date, mentions_month, parse_published,
-                    primary_range, published_from_path)
+                    primary_range, published_from_path, today_jst)
 from .match import evaluate
 from .store import SeenStore
 from .xposts import published_from_url
@@ -155,7 +155,7 @@ def main(argv=None) -> int:
     parser.add_argument("--today", help="基準日 (YYYY-MM-DD)。テスト用。")
     args = parser.parse_args(argv)
 
-    today = date.fromisoformat(args.today) if args.today else date.today()
+    today = date.fromisoformat(args.today) if args.today else today_jst()
     watchlist = load_json(args.watchlist)
     candidates = (
         load_json(args.candidates) if args.candidates else json.load(sys.stdin)

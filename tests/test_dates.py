@@ -1,8 +1,9 @@
 import unittest
-from datetime import date
+from datetime import date, datetime, timezone
 
 from aew.dates import (extract_ranges, mentions_month, primary_range,
-                       published_from_path)
+                       published_from_path, today_jst)
+from aew.ingest import _has_ended
 
 REF = date(2026, 9, 10)
 
@@ -145,3 +146,24 @@ class TestMentionsMonth(unittest.TestCase):
 
     def test_時期の記述が無ければNone(self):
         self.assertIsNone(mentions_month("新作ゲーム情報", date(2026, 8, 25)))
+
+
+class Test基準日は日本時間(unittest.TestCase):
+    """日次巡回が動く UTC 23:00 は、日本ではもう翌日の朝 8 時。"""
+
+    def test_巡回時刻のUTCと日本時間では日付が違う(self):
+        now = datetime(2026, 11, 20, 23, 5, tzinfo=timezone.utc)
+        self.assertEqual(date(2026, 11, 21), today_jst(now))
+        # UTC の日付（= date.today() が返していたもの）は 1 日古い
+        self.assertEqual(date(2026, 11, 20), now.date())
+
+    def test_昼間は日本時間でもUTCと同じ日付(self):
+        now = datetime(2026, 11, 20, 3, 0, tzinfo=timezone.utc)
+        self.assertEqual(date(2026, 11, 20), today_jst(now))
+
+    def test_昨日終わった催しは基準日が日本時間なら終了と判定される(self):
+        """基準日が UTC だと、昨日で終わった会期を「最終日は今日」と見ていた。"""
+        event = {"start": "2026-11-01", "end": "2026-11-20"}
+        now = datetime(2026, 11, 20, 23, 5, tzinfo=timezone.utc)
+        self.assertTrue(_has_ended(event, today_jst(now)))
+        self.assertFalse(_has_ended(event, now.date()))

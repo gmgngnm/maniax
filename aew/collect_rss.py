@@ -12,10 +12,10 @@ import json
 import sys
 import urllib.error
 import urllib.request
-from datetime import date, timedelta
+from datetime import timedelta
 from xml.etree import ElementTree
 
-from .dates import parse_published
+from .dates import parse_published, today_jst
 from .sources import RSS_FEEDS
 
 USER_AGENT = "maniax-anime-event-watch/1.0 (+https://github.com/gmgngnm/maniax)"
@@ -115,7 +115,7 @@ def main(argv=None) -> int:
 
 
 def _drop_old(candidates: list[dict], max_age_days: int) -> list[dict]:
-    cutoff = date.today() - timedelta(days=max_age_days)
+    cutoff = today_jst() - timedelta(days=max_age_days)
     kept = []
     for candidate in candidates:
         published = parse_published(candidate.get("published", ""))

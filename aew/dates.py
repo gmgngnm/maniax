@@ -13,7 +13,22 @@
 
 import re
 import unicodedata
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta, timezone
+
+JST = timezone(timedelta(hours=9))
+
+
+def today_jst(now: datetime | None = None) -> date:
+    """基準日。日本時間で出す。
+
+    日次巡回は UTC 23:00（日本時間では翌朝 8:00）に動く。date.today() は
+    コンテナの UTC で日付を出すので、巡回のあいだはいつも日本時間より
+    1 日古い日付になる。それを基準日にすると、昨日で終わった催しが
+    「最終日はまだ今日」と判定されて新着として流れる。
+    """
+    now = now or datetime.now(timezone.utc)
+    return now.astimezone(JST).date()
+
 
 # 「2026年9月18日」「9月18日」「2026/9/18」「9/18」をまとめて受ける。
 _FULL = re.compile(
@@ -303,7 +318,7 @@ def published_from_path(url: str, today: date | None = None) -> date | None:
     """
     if not url:
         return None
-    today = today or date.today()
+    today = today or today_jst()
     path = re.sub(r"^https?://[^/]+", "", url)
     for match in _URL_DATE.finditer(path):
         year, month, day = (int(g) for g in match.groups())

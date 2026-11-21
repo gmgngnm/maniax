@@ -16,7 +16,7 @@ import unicodedata
 from datetime import date
 from pathlib import Path
 
-from .dates import extract_ranges, parse_published
+from .dates import extract_ranges, parse_published, today_jst
 from .fetch import FetchError, fetch_text
 
 # 判定結果
@@ -150,7 +150,7 @@ def main(argv=None) -> int:
     # 本文で日付が消えた・変わったものがあるので、通知文面を作り直す
     from . import digest as digest_mod
 
-    today = date.fromisoformat(digest.get("generated_at", date.today().isoformat()))
+    today = date.fromisoformat(digest.get("generated_at", today_jst().isoformat()))
     digest["items"] = items
     digest["count"] = len(items)
     digest["push"] = digest_mod.push_line(items)
